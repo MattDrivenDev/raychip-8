@@ -1,6 +1,6 @@
 /*
     Author: Matt Ball
-    GitHub: https://github.com/MattDrivenDev
+    GitHub: https://github.com/MattDrivenDev/raychip-8
     Documentation: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 */
 
@@ -29,25 +29,51 @@
 //----------------------------------------------------------------------------------
 typedef struct 
 {
-    int instruction;
-    int addr;
-    int n;
-    int x;
-    int y;
-    int kk;
+    unsigned short instruction;
+    unsigned char addr;
+    unsigned char n;
+    unsigned char x;
+    unsigned char y;
+    unsigned char kk;
 } C8_Instruction;
 
 //----------------------------------------------------------------------------------
 // Local Variables Definition (local to this module)
 //----------------------------------------------------------------------------------
-int C8_RAM[C8_MEMORY]           = {0};
-int C8_PC                       = C8_START;
-int C8_SP                       = 0;
-int C8_I                        = 0;
-int C8_STACK[C8_STACK_SIZE]     = {0};
-int C8_V[C8_V_REGISTER_COUNT]   = {0};
-int C8_ST                       = 0;
-int C8_DT                       = 0;
+
+// The Chip-8 language is capable of accessing up to 4KB (4,096 bytes) of RAM, from 
+// location 0x000 (0) to 0xFFF (4095). The first 512 bytes, from 0x000 to 0x1FF, are 
+// where the original interpreter was located, and should not be used by programs.
+// Most Chip-8 programs start at location 0x200 (512)
+unsigned char C8_RAM[C8_MEMORY]           = {0};
+
+// Chip-8 has 16 general purpose 8-bit registers, usually referred to as Vx, where x 
+// is a hexadecimal digit (0 through F). The VF register should not be used by any 
+// program, as it is used as a flag by some instructions. 
+unsigned char C8_V[C8_V_REGISTER_COUNT]   = {0};
+
+// There is also a 16-bit register called I. This register is generally used to store 
+// memory addresses, so only the lowest (rightmost) 12 bits are usually used.
+unsigned short C8_I                       = 0;
+
+// Chip-8 also has two special purpose 8-bit registers, for the delay and sound timers. 
+// When these registers are non-zero, they are automatically decremented at a rate of 
+// 60Hz. See the section 2.5, Timers & Sound, for more information on these.
+unsigned char C8_ST                       = 0;
+unsigned char C8_DT                       = 0;
+
+// The program counter (PC) should be 16-bit, and is used to store the currently 
+// executing address.
+unsigned short C8_PC                      = C8_START;
+
+// The stack pointer (SP) can be 8-bit, it is used to point to the topmost level 
+// of the stack.
+unsigned char C8_SP                       = 0;
+
+// The stack is an array of 16 16-bit values, used to store the address that the 
+// interpreter shoud return to when finished with a subroutine. Chip-8 allows for 
+// up to 16 levels of nested subroutines.
+unsigned short C8_STACK[C8_STACK_SIZE]    = {0};
 
 //----------------------------------------------------------------------------------
 // Chip-8 Instruction Set Declaration
@@ -203,14 +229,15 @@ void C8_CLS(C8_Instruction *instruction)
 // the stack, then subtracts 1 from the stack pointer.
 void C8_RET(C8_Instruction *instruction)
 {
-
+    C8_PC = C8_STACK[C8_SP];
+    C8_SP -= 1;
 }
 
 // Jump to location nnn.
 // The interpreter sets the program counter to nnn.
 void C8_JP_ADDR(C8_Instruction *instruction)
 {
-
+    C8_PC = instruction->addr;
 }
 
 // Call subroutine at nnn.
@@ -218,7 +245,9 @@ void C8_JP_ADDR(C8_Instruction *instruction)
 // PC on top of the stack. The PC is then set to nnn.
 void C8_CALL_ADDR(C8_Instruction *instruction)
 {
-
+    C8_SP += 1;
+    C8_STACK[C8_SP] = C8_PC;
+    C8_PC = instruction->addr;
 }
 
 // Skip next instruction if Vx = kk.
@@ -226,7 +255,10 @@ void C8_CALL_ADDR(C8_Instruction *instruction)
 // increments the program counter by 2.
 void C8_SE_VX_BYTE(C8_Instruction *instruction)
 {
-
+    if (C8_V[instruction->x] == instruction->kk)
+    {
+        increment_program_counter();
+    }
 }
 
 // Skip next instruction if Vx != kk.
@@ -234,7 +266,10 @@ void C8_SE_VX_BYTE(C8_Instruction *instruction)
 // equal, increments the program counter by 2.
 void C8_SNE_VX_BYTE(C8_Instruction *instruction)
 {
-
+    if (C8_V[instruction->x] != instruction->kk)
+    {
+        increment_program_counter();
+    }
 }
 
 // Skip next instruction if Vx = Vy.
@@ -242,14 +277,17 @@ void C8_SNE_VX_BYTE(C8_Instruction *instruction)
 // are equal, increments the program counter by 2
 void C8_SE_VX_VY(C8_Instruction *instruction)
 {
-
+    if (C8_V[instruction->x] == C8_V[instruction->y])
+    {
+        increment_program_counter();
+    }
 }
 
 // Set Vx = kk.
 // The interpreter puts the value kk into register Vx.
 void C8_LD_VX_BYTE(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = instruction->kk;
 }
 
 // Set Vx = Vx + kk.
@@ -257,14 +295,14 @@ void C8_LD_VX_BYTE(C8_Instruction *instruction)
 // result in Vx.
 void C8_ADD_VX_BYTE(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = C8_V[instruction->x] + instruction->kk;
 }
 
 // Set Vx = Vy.
 // Stores the value of register Vy in register Vx.
 void C8_LD_VX_VY(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = C8_V[instruction->y];
 }
 
 // Set Vx = Vx OR Vy.
