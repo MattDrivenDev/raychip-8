@@ -23,6 +23,8 @@
 #define C8_V_REGISTER_COUNT     16
 #define C8_PIXEL_WIDTH          10
 #define C8_PIXEL_HEIGHT         10
+#define C8_VF                   15
+#define C8_V0                   0
 
 //----------------------------------------------------------------------------------
 // Typedefs
@@ -136,7 +138,6 @@ int main()
     C8_Instruction instruction;
     load_rom();
 
-
     //--------------------------------------------------------------------------------------
     // Main Game Loop
     while (!WindowShouldClose())
@@ -199,7 +200,7 @@ void load_rom()
 
     if (filedata != NULL)
     {
-        TraceLog(LOG_DEBUG, "FILEIO: [$s] ROM data loaded %i bytes of data", filesize);
+        TraceLog(LOG_INFO, "FILEIO: [$s] ROM data loaded %i bytes of data", C8_FILENAME, filesize);
         for (i = 0; i < filesize; i++)
         {
             // Will convert the char to the int representation (note, the char code - not
@@ -312,7 +313,7 @@ void C8_LD_VX_VY(C8_Instruction *instruction)
 // also 1. Otherwise, it is 0.
 void C8_OR_VX_VY(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = C8_V[instruction->x] | C8_V[instruction->y];
 }
 
 // Set Vx = Vx AND Vy.
@@ -322,7 +323,7 @@ void C8_OR_VX_VY(C8_Instruction *instruction)
 // also 1. Otherwise, it is 0.
 void C8_AND_VX_VY(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = C8_V[instruction->x] & C8_V[instruction->y];
 }
 
 // Set Vx = Vx XOR Vy.
@@ -332,7 +333,7 @@ void C8_AND_VX_VY(C8_Instruction *instruction)
 // bit in the result is set to 1. Otherwise, it is 0.
 void C8_XOR_VX_VY(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = C8_V[instruction->x] ^ C8_V[instruction->y];
 }
 
 // Set Vx = Vx + Vy, set VF = carry.
@@ -341,7 +342,10 @@ void C8_XOR_VX_VY(C8_Instruction *instruction)
 // 8 bits of the result are kept, and stored in Vx.
 void C8_ADD_VX_VY(C8_Instruction *instruction)
 {
-
+    short vx = C8_V[instruction->x] + C8_V[instruction->y];
+    // TODO is this right?
+    C8_V[C8_VF] = vx > sizeof(char);
+    C8_V[instruction->x] = vx;
 }
 
 // Set Vx = Vx - Vy, set VF = NOT borrow.
@@ -349,7 +353,8 @@ void C8_ADD_VX_VY(C8_Instruction *instruction)
 // from Vx, and the result stored in Vx.
 void C8_SUB_VX_VY(C8_Instruction *instruction)
 {
-
+    C8_V[C8_VF] = C8_V[instruction->x] > C8_V[instruction->y];
+    C8_V[instruction->x] = C8_V[instruction->x] - C8_V[instruction->y];
 }
 
 // Set Vx = Vx SHR 1.
@@ -357,7 +362,10 @@ void C8_SUB_VX_VY(C8_Instruction *instruction)
 // 0. Then Vx is divided by 2.
 void C8_SHR_VX_VY(C8_Instruction *instruction)
 {
-
+    // TODO I think this will work but I wonder if there is a bitwise 
+    // operation that will work better.
+    C8_V[C8_VF] = C8_V[instruction->x] % 2;
+    C8_V[instruction->x] = C8_V[instruction->x] / 2;
 }
 
 // Set Vx = Vy - Vx, set VF = NOT borrow.
@@ -365,7 +373,8 @@ void C8_SHR_VX_VY(C8_Instruction *instruction)
 // from Vy, and the results are stored in Vx.
 void C8_SUBN_VX_VY(C8_Instruction *instruction)
 {
-
+    C8_V[C8_VF] = C8_V[instruction->y] > C8_V[instruction->x];
+    C8_V[instruction->x] = C8_V[instruction->y] - C8_V[instruction->x];
 }
 
 // Set Vx = Vx SHL 1.
@@ -373,7 +382,10 @@ void C8_SUBN_VX_VY(C8_Instruction *instruction)
 // Then Vx is multiplied by 2.
 void C8_SHL_VX_VY(C8_Instruction *instruction)
 {
-
+    // TODO I think this will work but I wonder if there is a bitwise 
+    // operation that will work better.
+    C8_V[C8_VF] = C8_V[instruction->x] > 128;
+    C8_V[instruction->x] = C8_V[instruction->x] * 2;
 }
 
 // Skip next instruction if Vx != Vy.
@@ -381,21 +393,24 @@ void C8_SHL_VX_VY(C8_Instruction *instruction)
 // program counter is increased by 2.
 void C8_SNE_VX_VY(C8_Instruction *instruction)
 {
-
+    if (C8_V[instruction->x] != C8_V[instruction->y])
+    {
+        increment_program_counter();
+    }
 }
 
 // Set I = nnn.
 // The value of register I is set to nnn.
 void C8_LD_I_ADDR(C8_Instruction *instruction)
 {
-
+    C8_I = instruction->addr;
 }
 
 // Jump to location nnn + V0.
-// The program counter is set to nnn pls the value of V0.
+// The program counter is set to nnn plus the value of V0.
 void C8_JP_V0_ADDR(C8_Instruction *instruction)
 {
-
+    C8_PC = instruction->addr + C8_V[C8_V0];
 }
 
 // Set Vx = random byte and kk.
@@ -404,7 +419,8 @@ void C8_JP_V0_ADDR(C8_Instruction *instruction)
 // See instruction C8_AND_VX_VY for more information on AND.
 void C8_RND_VX_BYTE(C8_Instruction *instruction)
 {
-
+    unsigned char n = GetRandomValue(0, 255);
+    C8_V[instruction->x] = n & instruction->kk;
 }
 
 // Display n-byte sprite starting at memory location I at (Vx, Vy), set 
@@ -442,7 +458,7 @@ void C8_SKNP_VX(C8_Instruction *instruction)
 // The value of DT is placed into Vx.
 void C8_LD_VX_DT(C8_Instruction *instruction)
 {
-
+    C8_V[instruction->x] = C8_DT;
 }
 
 // Wait for a key press, store the value of the key in Vx.
@@ -457,21 +473,21 @@ void C8_LD_VX_K(C8_Instruction *instruction)
 // DT is set equal to the value of Vx.
 void C8_LD_DT_VX(C8_Instruction *instruction)
 {
-
+    C8_DT = C8_V[instruction->x];
 }
 
 // Set sound timer = Vx.
 // ST is set equal to the value of Vx.
 void C8_LD_ST_VX(C8_Instruction *instruction)
 {
-
+    C8_ST = C8_V[instruction->x];
 }
 
 // Set I = I + Vx.
 // The values of I and Vx are added, and the results are stored in I.
 void C8_ADD_I_VX(C8_Instruction *instruction)
 {
-
+    C8_I = C8_I + C8_V[instruction->x];
 }
 
 // Set I = location of sprite for digit Vx.
@@ -505,5 +521,9 @@ void C8_LD_I_VX(C8_Instruction *instruction)
 // into registers V0 through Vx.
 void C8_LD_VX_I(C8_Instruction *instruction)
 {
-
+    int i;
+    for (i = C8_V0; i <= instruction->x; i++)
+    {
+        C8_V[i] = C8_RAM[C8_I + i];
+    }
 }
