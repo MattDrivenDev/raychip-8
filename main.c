@@ -77,9 +77,24 @@ unsigned char C8_SP                       = 0;
 // up to 16 levels of nested subroutines.
 unsigned short C8_STACK[C8_STACK_SIZE]    = {0};
 
+// The original implementation of the Chip-8 language used a 64x32-pixel monochrome
+// display with this format:
+//                           +--------------------+
+//                           |(0,0)        (63, 0)|
+//                           |                    |
+//                           |                    |
+//                           |                    |
+//                           |(0,31)       (64,31)|
+//                           +--------------------+
+// Chip-8 draws graphics on screen through the use of sprites. A sprite is a group
+// of bytes which are a binary representation of the desired picture. Chip-8 sprites
+// may be up to 15 butes, for a possible sprite size of 8x15.
+bool C8_Buffer[C8_HEIGHT][C8_WIDTH]       = {false};
+
 //----------------------------------------------------------------------------------
 // Chip-8 Instruction Set Declaration
 //----------------------------------------------------------------------------------
+void C8_SYS_ADDR                (C8_Instruction *instruction);
 void C8_CLS                     (C8_Instruction *instruction);
 void C8_RET                     (C8_Instruction *instruction);
 void C8_JP_ADDR                 (C8_Instruction *instruction);
@@ -122,6 +137,8 @@ void parse_instruction          (C8_Instruction *instruction);
 void interpret_instruction      (C8_Instruction *instruction);
 void increment_program_counter  ();
 void load_rom                   ();
+void render_buffer              ();
+void helloworld                 ();
 
 //----------------------------------------------------------------------------------
 // Main entry point
@@ -145,6 +162,10 @@ int main()
         parse_instruction(&instruction);
         interpret_instruction(&instruction);
         increment_program_counter();
+
+        // Testing
+        helloworld();
+        render_buffer();
     }
 
     // De-Initialization
@@ -215,14 +236,41 @@ void load_rom()
     }
 }
 
+void render_buffer()
+{
+    BeginDrawing();
+    ClearBackground(BLACK);
+    for (int i = 0; i < C8_HEIGHT; i++)
+    {
+        for (int j = 0; j < C8_WIDTH; j++)
+        {
+            if (C8_Buffer[i][j])
+            {
+                int x = j * C8_PIXEL_WIDTH;
+                int y = i * C8_PIXEL_HEIGHT;
+                DrawRectangle(x, y, C8_PIXEL_WIDTH, C8_PIXEL_HEIGHT, GREEN);
+            }
+        }
+    }    
+    EndDrawing();
+}
+
 //----------------------------------------------------------------------------------
 // Follows the Chip-8 Instruction Set Functions
 //----------------------------------------------------------------------------------
 
+// Jump to a machine code routine at nnn.
+// This instruction is only used on the old computers on which the Chip-8
+// was originally implemented. It is ignored by modern interpreters.
+void C8_SYS_ADDR(C8_Instruction *instruction)
+{
+
+}
+
 // Clear the display.
 void C8_CLS(C8_Instruction *instruction)
 {
-
+    memset(C8_Buffer, false, sizeof(C8_Buffer));
 }
 
 // Return from a subroutine.
@@ -526,4 +574,82 @@ void C8_LD_VX_I(C8_Instruction *instruction)
     {
         C8_V[i] = C8_RAM[C8_I + i];
     }
+}
+
+//----------------------------------------------------------------------------------
+// Follows Testing-Only Functions
+//----------------------------------------------------------------------------------
+
+// Prints some "HELLOWORLD" text on into the screen buffer.
+void helloworld()
+{
+    // H
+    C8_Buffer[1][1] = true; C8_Buffer[1][2] = false; C8_Buffer[1][3] = true;
+    C8_Buffer[2][1] = true; C8_Buffer[2][2] = false; C8_Buffer[2][3] = true;
+    C8_Buffer[3][1] = true; C8_Buffer[3][2] = true;  C8_Buffer[3][3] = true;
+    C8_Buffer[4][1] = true; C8_Buffer[4][2] = false; C8_Buffer[4][3] = true;
+    C8_Buffer[5][1] = true; C8_Buffer[5][2] = false; C8_Buffer[5][3] = true; 
+
+    // E
+    C8_Buffer[1][5] = true; C8_Buffer[1][6] = true;  C8_Buffer[1][7] = true;
+    C8_Buffer[2][5] = true; C8_Buffer[2][6] = false; C8_Buffer[2][7] = false;
+    C8_Buffer[3][5] = true; C8_Buffer[3][6] = true;  C8_Buffer[3][7] = true;
+    C8_Buffer[4][5] = true; C8_Buffer[4][6] = false; C8_Buffer[4][7] = false;
+    C8_Buffer[5][5] = true; C8_Buffer[5][6] = true;  C8_Buffer[5][7] = true; 
+
+    // L
+    C8_Buffer[1][9] = true; C8_Buffer[1][10] = false; C8_Buffer[1][11] = false;
+    C8_Buffer[2][9] = true; C8_Buffer[2][10] = false; C8_Buffer[2][11] = false;
+    C8_Buffer[3][9] = true; C8_Buffer[3][10] = false; C8_Buffer[3][11] = false;
+    C8_Buffer[4][9] = true; C8_Buffer[4][10] = false; C8_Buffer[4][11] = false;
+    C8_Buffer[5][9] = true; C8_Buffer[5][10] = true;  C8_Buffer[5][11] = true; 
+
+    // L
+    C8_Buffer[1][13] = true; C8_Buffer[1][14] = false; C8_Buffer[1][15] = false;
+    C8_Buffer[2][13] = true; C8_Buffer[2][14] = false; C8_Buffer[2][15] = false;
+    C8_Buffer[3][13] = true; C8_Buffer[3][14] = false; C8_Buffer[3][15] = false;
+    C8_Buffer[4][13] = true; C8_Buffer[4][14] = false; C8_Buffer[4][15] = false;
+    C8_Buffer[5][13] = true; C8_Buffer[5][14] = true;  C8_Buffer[5][15] = true; 
+
+    // O
+    C8_Buffer[1][17] = true; C8_Buffer[1][18] = true;  C8_Buffer[1][19] = true;
+    C8_Buffer[2][17] = true; C8_Buffer[2][18] = false; C8_Buffer[2][19] = true;
+    C8_Buffer[3][17] = true; C8_Buffer[3][18] = false; C8_Buffer[3][19] = true;
+    C8_Buffer[4][17] = true; C8_Buffer[4][18] = false; C8_Buffer[4][19] = true;
+    C8_Buffer[5][17] = true; C8_Buffer[5][18] = true;  C8_Buffer[5][19] = true; 
+
+    // W
+    C8_Buffer[1][21] = true; C8_Buffer[1][22] = false; C8_Buffer[1][23] = true;
+    C8_Buffer[2][21] = true; C8_Buffer[2][22] = false; C8_Buffer[2][23] = true;
+    C8_Buffer[3][21] = true; C8_Buffer[3][22] = false; C8_Buffer[3][23] = true;
+    C8_Buffer[4][21] = true; C8_Buffer[4][22] = true;  C8_Buffer[4][23] = true;
+    C8_Buffer[5][21] = true; C8_Buffer[5][22] = false; C8_Buffer[5][23] = true; 
+
+    // O
+    C8_Buffer[1][25] = true; C8_Buffer[1][26] = true;  C8_Buffer[1][27] = true;
+    C8_Buffer[2][25] = true; C8_Buffer[2][26] = false; C8_Buffer[2][27] = true;
+    C8_Buffer[3][25] = true; C8_Buffer[3][26] = false; C8_Buffer[3][27] = true;
+    C8_Buffer[4][25] = true; C8_Buffer[4][26] = false; C8_Buffer[4][27] = true;
+    C8_Buffer[5][25] = true; C8_Buffer[5][26] = true;  C8_Buffer[5][27] = true; 
+
+    // R
+    C8_Buffer[1][29] = true; C8_Buffer[1][30] = true;  C8_Buffer[1][31] = false;
+    C8_Buffer[2][29] = true; C8_Buffer[2][30] = false; C8_Buffer[2][31] = true;
+    C8_Buffer[3][29] = true; C8_Buffer[3][30] = true;  C8_Buffer[3][31] = false;
+    C8_Buffer[4][29] = true; C8_Buffer[4][30] = false; C8_Buffer[4][31] = true;
+    C8_Buffer[5][29] = true; C8_Buffer[5][30] = false; C8_Buffer[5][31] = true; 
+
+    // L
+    C8_Buffer[1][33] = true; C8_Buffer[1][34] = false; C8_Buffer[1][35] = false;
+    C8_Buffer[2][33] = true; C8_Buffer[2][34] = false; C8_Buffer[2][35] = false;
+    C8_Buffer[3][33] = true; C8_Buffer[3][34] = false; C8_Buffer[3][35] = false;
+    C8_Buffer[4][33] = true; C8_Buffer[4][34] = false; C8_Buffer[4][35] = false;
+    C8_Buffer[5][33] = true; C8_Buffer[5][34] = true;  C8_Buffer[5][35] = true; 
+
+    // O
+    C8_Buffer[1][37] = true; C8_Buffer[1][38] = true;  C8_Buffer[1][39] = false;
+    C8_Buffer[2][37] = true; C8_Buffer[2][38] = false; C8_Buffer[2][39] = true;
+    C8_Buffer[3][37] = true; C8_Buffer[3][38] = false; C8_Buffer[3][39] = true;
+    C8_Buffer[4][37] = true; C8_Buffer[4][38] = false; C8_Buffer[4][39] = true;
+    C8_Buffer[5][37] = true; C8_Buffer[5][38] = true;  C8_Buffer[5][39] = false; 
 }
