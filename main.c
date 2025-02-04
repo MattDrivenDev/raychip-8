@@ -33,10 +33,12 @@ typedef struct
 {
     unsigned short instruction;
     unsigned char addr;
+    unsigned char msn;
     unsigned char n;
     unsigned char x;
     unsigned char y;
     unsigned char kk;
+    unsigned char skip;
 } C8_Instruction;
 
 //----------------------------------------------------------------------------------
@@ -91,6 +93,9 @@ unsigned short C8_STACK[C8_STACK_SIZE]    = {0};
 // may be up to 15 butes, for a possible sprite size of 8x15.
 bool C8_Buffer[C8_HEIGHT][C8_WIDTH]       = {false};
 
+// The computers which originally used the Chip-8 Language had a 16-key hexadecimal keypad.
+bool C8_Keyboard[0xF]                     = {0};
+
 //----------------------------------------------------------------------------------
 // Chip-8 Instruction Set Declaration
 //----------------------------------------------------------------------------------
@@ -135,9 +140,10 @@ void C8_LD_VX_I                 (C8_Instruction *instruction);
 //----------------------------------------------------------------------------------
 void parse_instruction          (C8_Instruction *instruction);
 void interpret_instruction      (C8_Instruction *instruction);
-void increment_program_counter  ();
+void increment_program_counter  (C8_Instruction *instruction);
 void load_rom                   ();
 void render_buffer              ();
+void read_input                 ();
 void helloworld                 ();
 
 //----------------------------------------------------------------------------------
@@ -159,12 +165,14 @@ int main()
     // Main Game Loop
     while (!WindowShouldClose())
     {
+        read_input();
+        
         parse_instruction(&instruction);
-        interpret_instruction(&instruction);
-        increment_program_counter();
 
-        // Testing
-        helloworld();
+        interpret_instruction(&instruction);
+
+        increment_program_counter(&instruction);
+
         render_buffer();
     }
 
@@ -178,7 +186,68 @@ int main()
 
 void interpret_instruction(C8_Instruction *instruction)
 {
-
+    switch (instruction->msn)
+    {
+        case 0x0:
+            switch (instruction->kk)
+            {
+                case 0xE0:  C8_CLS(instruction);                    break;
+                case 0xEE:  C8_RET(instruction);                    break;        
+                default:    C8_SYS_ADDR(instruction);               break;
+            }
+            break;
+        case 0x1:       C8_JP_ADDR(instruction);                    break;
+        case 0x2:       C8_CALL_ADDR(instruction);                  break;
+        case 0x3:       C8_SE_VX_BYTE(instruction);                 break;
+        case 0x4:       C8_SNE_VX_BYTE(instruction);                break;
+        case 0x5:       C8_SE_VX_VY(instruction);                   break;
+        case 0x6:       C8_LD_VX_BYTE(instruction);                 break;
+        case 0x7:       C8_ADD_VX_BYTE(instruction);                break;
+        case 0x8:
+            switch (instruction->n)
+            {
+                case 0x0:   C8_LD_VX_VY(instruction);               break;
+                case 0x1:   C8_OR_VX_VY(instruction);               break;  
+                case 0x2:   C8_AND_VX_VY(instruction);              break;        
+                case 0x3:   C8_XOR_VX_VY(instruction);              break;  
+                case 0x4:   C8_ADD_VX_VY(instruction);              break;  
+                case 0x5:   C8_SUB_VX_VY(instruction);              break;  
+                case 0x6:   C8_SHR_VX_VY(instruction);              break;  
+                case 0x7:   C8_SUBN_VX_VY(instruction);             break;  
+                case 0xE:   C8_SHL_VX_VY(instruction);              break;  
+                default:    TraceLog(LOG_ERROR, "Unknown");         break;
+            }
+            break;
+        case 0x9:       C8_SNE_VX_VY(instruction);                  break;
+        case 0xA:       C8_LD_I_ADDR(instruction);                  break;
+        case 0xB:       C8_JP_V0_ADDR(instruction);                 break;
+        case 0xC:       C8_RND_VX_BYTE(instruction);                break;
+        case 0xD:       C8_DRW_VX_VY_NIBBLE(instruction);           break;
+        case 0xE:
+            switch (instruction->kk)
+            {
+                case 0x9E:  C8_SKP_VX(instruction);                 break;
+                case 0xA1:  C8_SKNP_VX(instruction);                break;
+                default:    TraceLog(LOG_ERROR, "Unknown");         break;
+            }
+            break;
+        case 0xF:
+            switch (instruction->kk)
+            {
+                case 0x07:  C8_LD_VX_DT(instruction);               break;    
+                case 0x0A:  C8_LD_VX_K(instruction);                break;    
+                case 0x15:  C8_LD_DT_VX(instruction);               break;    
+                case 0x18:  C8_LD_ST_VX(instruction);               break;    
+                case 0x1E:  C8_ADD_I_VX(instruction);               break;    
+                case 0x29:  C8_LD_F_VX(instruction);                break;    
+                case 0x33:  C8_LD_B_VX(instruction);                break;    
+                case 0x55:  C8_LD_I_VX(instruction);                break;    
+                case 0x65:  C8_LD_VX_I(instruction);                break;                              
+                default:    TraceLog(LOG_ERROR, "Unknown");         break;
+            }
+            break;
+        default:            TraceLog(LOG_ERROR, "Unknown");         break;
+    }
 }
 
 void parse_instruction(C8_Instruction *instruction)
@@ -187,30 +256,39 @@ void parse_instruction(C8_Instruction *instruction)
     // In memory, the first byte of each instruction should be located at an even
     // address. If a program includes sprite data, it should be padded so any 
     // instructions following it will be properly situated in RAM.
-    int first_byte                  = C8_RAM[C8_PC];
-    int second_byte                 = C8_RAM[C8_PC + 1];
-    int opcode                      = first_byte << 8 | second_byte;
-    instruction->instruction        = opcode;
+    unsigned char first_byte        = C8_RAM[C8_PC];
+    unsigned char second_byte       = C8_RAM[C8_PC + 1];
+    instruction->instruction        = first_byte << 8 | second_byte;
     
     // nnn or addr - A 12-bit value, the lowest 12 bits of the instruction
-    instruction->addr               = opcode & 0x0FFF;
+    instruction->addr               = instruction->instruction & 0x0FFF;
+
+    // msn or most-significant-nibble - A 4-bit value, the highest 4 bits of the instruction
+    instruction->msn                = instruction->instruction & 0xF000;
 
     // n or nibble - A 4-bit value, the lowest 4 bits of the instruction
-    instruction->n                  = opcode & 0x000F;
+    instruction->n                  = instruction->instruction & 0x000F;
 
     // x - A 4-bit value, the lower 4 bits of the high byte of the instruction
-    instruction->x                  = opcode & 0x0F00 >> 8;
+    instruction->x                  = instruction->instruction & 0x0F00 >> 8;
 
     // y - A 4-bit value, the upper 4 bits of the low byte of the instruction
-    instruction->y                  = opcode & 0x00F0 >> 4;
+    instruction->y                  = instruction->instruction & 0x00F0 >> 4;
 
     // kk or byte - An 8-bit value, the lowest 8 bits of the instruction
-    instruction->kk                 = opcode & 0x00FF;
+    instruction->kk                 = instruction->instruction & 0x00FF;
 }
 
-void increment_program_counter()
+void increment_program_counter(C8_Instruction *instruction)
 {
-    C8_PC += 2;
+    if (!instruction->skip)
+    {
+        C8_PC += 2;
+    }
+    else
+    {
+        instruction->skip -= 1;
+    }
 }
 
 void load_rom()
@@ -255,6 +333,30 @@ void render_buffer()
     EndDrawing();
 }
 
+void read_input()
+{
+    // This should of course be replaced with a configurable mapping.
+    // I suspect that some kind of hashtable that marries the raylib key
+    // enum to the correct key - and then we can check the IsKeyDown
+    // for each.
+    C8_Keyboard[0x0] = IsKeyDown(KEY_ZERO);
+    C8_Keyboard[0x1] = IsKeyDown(KEY_ONE);
+    C8_Keyboard[0x2] = IsKeyDown(KEY_TWO);
+    C8_Keyboard[0x3] = IsKeyDown(KEY_THREE);
+    C8_Keyboard[0x4] = IsKeyDown(KEY_FOUR);
+    C8_Keyboard[0x5] = IsKeyDown(KEY_FIVE);
+    C8_Keyboard[0x6] = IsKeyDown(KEY_SIX);
+    C8_Keyboard[0x7] = IsKeyDown(KEY_SEVEN);
+    C8_Keyboard[0x8] = IsKeyDown(KEY_EIGHT);
+    C8_Keyboard[0x9] = IsKeyDown(KEY_NINE);
+    C8_Keyboard[0xA] = IsKeyDown(KEY_A);
+    C8_Keyboard[0xB] = IsKeyDown(KEY_B);
+    C8_Keyboard[0xC] = IsKeyDown(KEY_C);
+    C8_Keyboard[0xD] = IsKeyDown(KEY_D);
+    C8_Keyboard[0xE] = IsKeyDown(KEY_E);
+    C8_Keyboard[0xF] = IsKeyDown(KEY_F);
+}
+
 //----------------------------------------------------------------------------------
 // Follows the Chip-8 Instruction Set Functions
 //----------------------------------------------------------------------------------
@@ -270,7 +372,7 @@ void C8_SYS_ADDR(C8_Instruction *instruction)
 // Clear the display.
 void C8_CLS(C8_Instruction *instruction)
 {
-    memset(C8_Buffer, false, sizeof(C8_Buffer));
+    memset(&C8_Buffer, false, sizeof(C8_Buffer));
 }
 
 // Return from a subroutine.
@@ -306,7 +408,7 @@ void C8_SE_VX_BYTE(C8_Instruction *instruction)
 {
     if (C8_V[instruction->x] == instruction->kk)
     {
-        increment_program_counter();
+        increment_program_counter(instruction);
     }
 }
 
@@ -317,7 +419,7 @@ void C8_SNE_VX_BYTE(C8_Instruction *instruction)
 {
     if (C8_V[instruction->x] != instruction->kk)
     {
-        increment_program_counter();
+        increment_program_counter(instruction);
     }
 }
 
@@ -328,7 +430,7 @@ void C8_SE_VX_VY(C8_Instruction *instruction)
 {
     if (C8_V[instruction->x] == C8_V[instruction->y])
     {
-        increment_program_counter();
+        increment_program_counter(instruction);
     }
 }
 
@@ -443,7 +545,7 @@ void C8_SNE_VX_VY(C8_Instruction *instruction)
 {
     if (C8_V[instruction->x] != C8_V[instruction->y])
     {
-        increment_program_counter();
+        increment_program_counter(instruction);
     }
 }
 
@@ -491,7 +593,10 @@ void C8_DRW_VX_VY_NIBBLE(C8_Instruction *instruction)
 // currently in the down position, PC is increased by 2.
 void C8_SKP_VX(C8_Instruction *instruction)
 {
-
+    if (C8_Keyboard[C8_V[instruction->x]])
+    {
+        increment_program_counter(instruction);
+    }
 }
 
 // Skip next instruction if key with the value of Vx is not pressed.
@@ -499,7 +604,10 @@ void C8_SKP_VX(C8_Instruction *instruction)
 // is currently in the up position, PC is increased by 2.
 void C8_SKNP_VX(C8_Instruction *instruction)
 {
-
+    if (!C8_Keyboard[C8_V[instruction->x]])
+    {
+        increment_program_counter(instruction);
+    }
 }
 
 // Set Vx = delay timer value.
@@ -514,7 +622,7 @@ void C8_LD_VX_DT(C8_Instruction *instruction)
 // key is stored in Vx.
 void C8_LD_VX_K(C8_Instruction *instruction)
 {
-
+    instruction->skip = 1;
 }
 
 // Set delay timer = Vx.
