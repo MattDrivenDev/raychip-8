@@ -31,7 +31,7 @@
 //----------------------------------------------------------------------------------
 typedef struct 
 {
-    unsigned short instruction;
+    unsigned short opcode;
     unsigned char addr;
     unsigned char msn;
     unsigned char n;
@@ -141,9 +141,11 @@ void C8_LD_VX_I                 (C8_Instruction *instruction);
 void parse_instruction          (C8_Instruction *instruction);
 void interpret_instruction      (C8_Instruction *instruction);
 void increment_program_counter  (C8_Instruction *instruction);
+void load_hexfont_sprites       ();
 void load_rom                   ();
 void render_buffer              ();
 void read_input                 ();
+void hexfont                    ();
 void helloworld                 ();
 
 //----------------------------------------------------------------------------------
@@ -159,6 +161,7 @@ int main()
     SetTargetFPS(60);      
     
     C8_Instruction instruction;
+    load_hexfont_sprites();
     load_rom();
 
     //--------------------------------------------------------------------------------------
@@ -252,31 +255,36 @@ void interpret_instruction(C8_Instruction *instruction)
 
 void parse_instruction(C8_Instruction *instruction)
 {
+    // Note: the ordering in which you & and >> is important, so use brackets
+    // to ensure that the ordering happens as desired.
+
     // All instructions are 2 bytes long and are stored most-significant-byte first.
     // In memory, the first byte of each instruction should be located at an even
     // address. If a program includes sprite data, it should be padded so any 
     // instructions following it will be properly situated in RAM.
     unsigned char first_byte        = C8_RAM[C8_PC];
     unsigned char second_byte       = C8_RAM[C8_PC + 1];
-    instruction->instruction        = first_byte << 8 | second_byte;
-    
-    // nnn or addr - A 12-bit value, the lowest 12 bits of the instruction
-    instruction->addr               = instruction->instruction & 0x0FFF;
+    unsigned short opcode           = first_byte << 8 | second_byte;
+
+    instruction->opcode             = opcode;
 
     // msn or most-significant-nibble - A 4-bit value, the highest 4 bits of the instruction
-    instruction->msn                = instruction->instruction & 0xF000;
+    instruction->msn                = (opcode & 0xF000) >> 12;
+    
+    // nnn or addr - A 12-bit value, the lowest 12 bits of the instruction
+    instruction->addr               = (opcode & 0x0FFF);
 
     // n or nibble - A 4-bit value, the lowest 4 bits of the instruction
-    instruction->n                  = instruction->instruction & 0x000F;
+    instruction->n                  = (opcode & 0x000F);
 
     // x - A 4-bit value, the lower 4 bits of the high byte of the instruction
-    instruction->x                  = instruction->instruction & 0x0F00 >> 8;
+    instruction->x                  = (opcode & 0x0F00) >> 8;
 
     // y - A 4-bit value, the upper 4 bits of the low byte of the instruction
-    instruction->y                  = instruction->instruction & 0x00F0 >> 4;
+    instruction->y                  = (opcode & 0x00F0) >> 4;
 
     // kk or byte - An 8-bit value, the lowest 8 bits of the instruction
-    instruction->kk                 = instruction->instruction & 0x00FF;
+    instruction->kk                 = (opcode & 0x00FF);
 }
 
 void increment_program_counter(C8_Instruction *instruction)
@@ -342,19 +350,127 @@ void read_input()
     C8_Keyboard[0x0] = IsKeyDown(KEY_ZERO);
     C8_Keyboard[0x1] = IsKeyDown(KEY_ONE);
     C8_Keyboard[0x2] = IsKeyDown(KEY_TWO);
-    C8_Keyboard[0x3] = IsKeyDown(KEY_THREE);
-    C8_Keyboard[0x4] = IsKeyDown(KEY_FOUR);
-    C8_Keyboard[0x5] = IsKeyDown(KEY_FIVE);
-    C8_Keyboard[0x6] = IsKeyDown(KEY_SIX);
-    C8_Keyboard[0x7] = IsKeyDown(KEY_SEVEN);
-    C8_Keyboard[0x8] = IsKeyDown(KEY_EIGHT);
-    C8_Keyboard[0x9] = IsKeyDown(KEY_NINE);
-    C8_Keyboard[0xA] = IsKeyDown(KEY_A);
-    C8_Keyboard[0xB] = IsKeyDown(KEY_B);
-    C8_Keyboard[0xC] = IsKeyDown(KEY_C);
-    C8_Keyboard[0xD] = IsKeyDown(KEY_D);
-    C8_Keyboard[0xE] = IsKeyDown(KEY_E);
-    C8_Keyboard[0xF] = IsKeyDown(KEY_F);
+    C8_Keyboard[0xC] = IsKeyDown(KEY_FOUR);
+
+    C8_Keyboard[0x4] = IsKeyDown(KEY_Q);
+    C8_Keyboard[0x5] = IsKeyDown(KEY_W);
+    C8_Keyboard[0x6] = IsKeyDown(KEY_E);
+    C8_Keyboard[0xD] = IsKeyDown(KEY_R);
+
+    C8_Keyboard[0x7] = IsKeyDown(KEY_A);
+    C8_Keyboard[0x8] = IsKeyDown(KEY_S);
+    C8_Keyboard[0x9] = IsKeyDown(KEY_D);
+    C8_Keyboard[0xE] = IsKeyDown(KEY_F);
+
+    C8_Keyboard[0xA] = IsKeyDown(KEY_Z);
+    C8_Keyboard[0x0] = IsKeyDown(KEY_X);
+    C8_Keyboard[0xB] = IsKeyDown(KEY_C);
+    C8_Keyboard[0xF] = IsKeyDown(KEY_V);
+}
+
+void load_hexfont_sprites()
+{
+    // Programs may also refer to a group of sprites representing the 
+    // hexadecimal digits 0 through F. These sprites are 5 bytes long, 
+    // or 8x5 pixels. The data should be stored in the interpreter 
+    // area of Chip-8 memory (0x000 to 0x1FF). Below is a listing of 
+    // each character's bytes, in binary and hexadecimal:
+    
+    C8_RAM[0x000] = 0xF0;           // ****
+    C8_RAM[0x001] = 0x90;           // *  *
+    C8_RAM[0x002] = 0x90;           // *  *
+    C8_RAM[0x003] = 0x90;           // *  *
+    C8_RAM[0x004] = 0xF0;           // ****
+    
+    C8_RAM[0x005] = 0x20;           //   * 
+    C8_RAM[0x006] = 0x60;           //  ** 
+    C8_RAM[0x007] = 0x20;           //   * 
+    C8_RAM[0x008] = 0x20;           //   * 
+    C8_RAM[0x009] = 0x70;           //  ***
+    
+    C8_RAM[0x00A] = 0xF0;           // ****
+    C8_RAM[0x00B] = 0x10;           //    *
+    C8_RAM[0x00C] = 0xF0;           // ****
+    C8_RAM[0x00D] = 0x80;           // *   
+    C8_RAM[0x00E] = 0xF0;           // ****
+    
+    C8_RAM[0x00F] = 0xF0;           // ****
+    C8_RAM[0x010] = 0x10;           //    *
+    C8_RAM[0x011] = 0xF0;           // ****
+    C8_RAM[0x012] = 0x10;           //    *
+    C8_RAM[0x013] = 0xF0;           // ****
+    
+    C8_RAM[0x014] = 0x90;           // *  *
+    C8_RAM[0x015] = 0x90;           // *  *
+    C8_RAM[0x016] = 0xF0;           // ****
+    C8_RAM[0x017] = 0x10;           //    *
+    C8_RAM[0x018] = 0x10;           //    *
+    
+    C8_RAM[0x019] = 0xF0;           // ****
+    C8_RAM[0x01A] = 0x80;           // *   
+    C8_RAM[0x01B] = 0xF0;           // ****
+    C8_RAM[0x01C] = 0x10;           //    *
+    C8_RAM[0x01D] = 0xF0;           // ****
+    
+    C8_RAM[0x01E] = 0xF0;           // ****
+    C8_RAM[0x01F] = 0x80;           // *   
+    C8_RAM[0x020] = 0xF0;           // ****
+    C8_RAM[0x021] = 0x90;           // *  *
+    C8_RAM[0x022] = 0xF0;           // ****
+    
+    C8_RAM[0x023] = 0xF0;           // ****
+    C8_RAM[0x024] = 0x10;           //    *
+    C8_RAM[0x025] = 0x20;           //   * 
+    C8_RAM[0x026] = 0x40;           //  *  
+    C8_RAM[0x027] = 0x40;           //  *  
+    
+    C8_RAM[0x028] = 0xF0;           // ****
+    C8_RAM[0x029] = 0x90;           // *  *
+    C8_RAM[0x02A] = 0xF0;           // ****
+    C8_RAM[0x02B] = 0x90;           // *  *
+    C8_RAM[0x02C] = 0xF0;           // ****
+    
+    C8_RAM[0x02D] = 0xF0;           // ****
+    C8_RAM[0x02E] = 0x90;           // *  *
+    C8_RAM[0x02F] = 0xF0;           // ****
+    C8_RAM[0x030] = 0x10;           //    *
+    C8_RAM[0x031] = 0xF0;           // ****
+    
+    C8_RAM[0x032] = 0xF0;           // ****
+    C8_RAM[0x033] = 0x90;           // *  *
+    C8_RAM[0x034] = 0xF0;           // ****
+    C8_RAM[0x035] = 0x90;           // *  *
+    C8_RAM[0x036] = 0x90;           // *  *
+    
+    C8_RAM[0x037] = 0xE0;           // *** 
+    C8_RAM[0x038] = 0x90;           // *  *
+    C8_RAM[0x039] = 0xE0;           // *** 
+    C8_RAM[0x03A] = 0x90;           // *  *
+    C8_RAM[0x03B] = 0xE0;           // *** 
+    
+    C8_RAM[0x03C] = 0xF0;           // ****
+    C8_RAM[0x03D] = 0x80;           // *   
+    C8_RAM[0x03E] = 0x80;           // *   
+    C8_RAM[0x03F] = 0x80;           // *   
+    C8_RAM[0x040] = 0xF0;           // ****
+    
+    C8_RAM[0x041] = 0xE0;           // *** 
+    C8_RAM[0x042] = 0x90;           // *  *
+    C8_RAM[0x043] = 0x90;           // *  *
+    C8_RAM[0x044] = 0x90;           // *  *
+    C8_RAM[0x045] = 0xE0;           // *** 
+    
+    C8_RAM[0x046] = 0xF0;           // ****
+    C8_RAM[0x047] = 0x80;           // *   
+    C8_RAM[0x048] = 0xF0;           // ****
+    C8_RAM[0x049] = 0x80;           // *   
+    C8_RAM[0x04A] = 0xF0;           // ****
+    
+    C8_RAM[0x04B] = 0xF0;           // ****
+    C8_RAM[0x04C] = 0x90;           // *   
+    C8_RAM[0x04D] = 0xF0;           // ****
+    C8_RAM[0x04E] = 0x80;           // *   
+    C8_RAM[0x04F] = 0x80;           // *   
 }
 
 //----------------------------------------------------------------------------------
@@ -687,6 +803,12 @@ void C8_LD_VX_I(C8_Instruction *instruction)
 //----------------------------------------------------------------------------------
 // Follows Testing-Only Functions
 //----------------------------------------------------------------------------------
+
+// Uses the C8_DRW_VX_VY_NIBBLE() function to draw the hexfont sprites to screen buffer.
+void hexfont()
+{
+    
+}
 
 // Prints some "HELLOWORLD" text on into the screen buffer.
 void helloworld()
