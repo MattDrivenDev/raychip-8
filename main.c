@@ -26,10 +26,27 @@
 #define C8_VF                   15
 #define C8_V0                   0
 
+#define C8_FONT_0_ADDR          0x000
+#define C8_FONT_1_ADDR          0x005
+#define C8_FONT_2_ADDR          0x00A
+#define C8_FONT_3_ADDR          0x00F
+#define C8_FONT_4_ADDR          0x014
+#define C8_FONT_5_ADDR          0x019
+#define C8_FONT_6_ADDR          0x01E
+#define C8_FONT_7_ADDR          0x023
+#define C8_FONT_8_ADDR          0x028
+#define C8_FONT_9_ADDR          0x02D
+#define C8_FONT_A_ADDR          0x032
+#define C8_FONT_B_ADDR          0x037
+#define C8_FONT_C_ADDR          0x03C
+#define C8_FONT_D_ADDR          0x041
+#define C8_FONT_E_ADDR          0x046
+#define C8_FONT_F_ADDR          0x04B
+
 //----------------------------------------------------------------------------------
 // Typedefs
 //----------------------------------------------------------------------------------
-typedef struct 
+typedef struct C8_Instruction
 {
     unsigned short opcode;
     unsigned char addr;
@@ -90,11 +107,14 @@ unsigned short C8_STACK[C8_STACK_SIZE]    = {0};
 //                           +--------------------+
 // Chip-8 draws graphics on screen through the use of sprites. A sprite is a group
 // of bytes which are a binary representation of the desired picture. Chip-8 sprites
-// may be up to 15 butes, for a possible sprite size of 8x15.
+// may be up to 15 bytes, for a possible sprite size of 8x15.
 bool C8_Buffer[C8_HEIGHT][C8_WIDTH]       = {false};
 
 // The computers which originally used the Chip-8 Language had a 16-key hexadecimal keypad.
 bool C8_Keyboard[0xF]                     = {0};
+
+// Somewhere to store the current instruction.
+C8_Instruction current_instruction        = {0};
 
 //----------------------------------------------------------------------------------
 // Chip-8 Instruction Set Declaration
@@ -145,8 +165,7 @@ void load_hexfont_sprites       ();
 void load_rom                   ();
 void render_buffer              ();
 void read_input                 ();
-void hexfont                    ();
-void helloworld                 ();
+void test_font                  ();
 
 //----------------------------------------------------------------------------------
 // Main entry point
@@ -160,9 +179,10 @@ int main()
     InitWindow(screenWidth, screenHeight, "raychip-8");  
     SetTargetFPS(60);      
     
-    C8_Instruction instruction;
     load_hexfont_sprites();
     load_rom();
+
+    test_font();
 
     //--------------------------------------------------------------------------------------
     // Main Game Loop
@@ -170,11 +190,11 @@ int main()
     {
         read_input();
         
-        parse_instruction(&instruction);
+        parse_instruction(&current_instruction);
 
-        interpret_instruction(&instruction);
+        interpret_instruction(&current_instruction);
 
-        increment_program_counter(&instruction);
+        increment_program_counter(&current_instruction);
 
         render_buffer();
     }
@@ -376,101 +396,101 @@ void load_hexfont_sprites()
     // area of Chip-8 memory (0x000 to 0x1FF). Below is a listing of 
     // each character's bytes, in binary and hexadecimal:
     
-    C8_RAM[0x000] = 0xF0;           // ****
-    C8_RAM[0x001] = 0x90;           // *  *
-    C8_RAM[0x002] = 0x90;           // *  *
-    C8_RAM[0x003] = 0x90;           // *  *
-    C8_RAM[0x004] = 0xF0;           // ****
+    C8_RAM[C8_FONT_0_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_0_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_0_ADDR + 2] = 0x90;              // *  *
+    C8_RAM[C8_FONT_0_ADDR + 3] = 0x90;              // *  *
+    C8_RAM[C8_FONT_0_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x005] = 0x20;           //   * 
-    C8_RAM[0x006] = 0x60;           //  ** 
-    C8_RAM[0x007] = 0x20;           //   * 
-    C8_RAM[0x008] = 0x20;           //   * 
-    C8_RAM[0x009] = 0x70;           //  ***
+    C8_RAM[C8_FONT_1_ADDR] = 0x20;                  //   * 
+    C8_RAM[C8_FONT_1_ADDR + 1] = 0x60;              //  ** 
+    C8_RAM[C8_FONT_1_ADDR + 2] = 0x20;              //   * 
+    C8_RAM[C8_FONT_1_ADDR + 3] = 0x20;              //   * 
+    C8_RAM[C8_FONT_1_ADDR + 4] = 0x70;              //  ***
     
-    C8_RAM[0x00A] = 0xF0;           // ****
-    C8_RAM[0x00B] = 0x10;           //    *
-    C8_RAM[0x00C] = 0xF0;           // ****
-    C8_RAM[0x00D] = 0x80;           // *   
-    C8_RAM[0x00E] = 0xF0;           // ****
+    C8_RAM[C8_FONT_2_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_2_ADDR + 1] = 0x10;              //    *
+    C8_RAM[C8_FONT_2_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_2_ADDR + 3] = 0x80;              // *   
+    C8_RAM[C8_FONT_2_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x00F] = 0xF0;           // ****
-    C8_RAM[0x010] = 0x10;           //    *
-    C8_RAM[0x011] = 0xF0;           // ****
-    C8_RAM[0x012] = 0x10;           //    *
-    C8_RAM[0x013] = 0xF0;           // ****
+    C8_RAM[C8_FONT_3_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_3_ADDR + 1] = 0x10;              //    *
+    C8_RAM[C8_FONT_3_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_3_ADDR + 3] = 0x10;              //    *
+    C8_RAM[C8_FONT_3_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x014] = 0x90;           // *  *
-    C8_RAM[0x015] = 0x90;           // *  *
-    C8_RAM[0x016] = 0xF0;           // ****
-    C8_RAM[0x017] = 0x10;           //    *
-    C8_RAM[0x018] = 0x10;           //    *
+    C8_RAM[C8_FONT_4_ADDR] = 0x90;                  // *  *
+    C8_RAM[C8_FONT_4_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_4_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_4_ADDR + 3] = 0x10;              //    *
+    C8_RAM[C8_FONT_4_ADDR + 4] = 0x10;              //    *
     
-    C8_RAM[0x019] = 0xF0;           // ****
-    C8_RAM[0x01A] = 0x80;           // *   
-    C8_RAM[0x01B] = 0xF0;           // ****
-    C8_RAM[0x01C] = 0x10;           //    *
-    C8_RAM[0x01D] = 0xF0;           // ****
+    C8_RAM[C8_FONT_5_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_5_ADDR + 1] = 0x80;              // *   
+    C8_RAM[C8_FONT_5_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_5_ADDR + 3] = 0x10;              //    *
+    C8_RAM[C8_FONT_5_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x01E] = 0xF0;           // ****
-    C8_RAM[0x01F] = 0x80;           // *   
-    C8_RAM[0x020] = 0xF0;           // ****
-    C8_RAM[0x021] = 0x90;           // *  *
-    C8_RAM[0x022] = 0xF0;           // ****
+    C8_RAM[C8_FONT_6_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_6_ADDR + 1] = 0x80;              // *   
+    C8_RAM[C8_FONT_6_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_6_ADDR + 3] = 0x90;              // *  *
+    C8_RAM[C8_FONT_6_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x023] = 0xF0;           // ****
-    C8_RAM[0x024] = 0x10;           //    *
-    C8_RAM[0x025] = 0x20;           //   * 
-    C8_RAM[0x026] = 0x40;           //  *  
-    C8_RAM[0x027] = 0x40;           //  *  
+    C8_RAM[C8_FONT_7_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_7_ADDR + 1] = 0x10;              //    *
+    C8_RAM[C8_FONT_7_ADDR + 2] = 0x20;              //   * 
+    C8_RAM[C8_FONT_7_ADDR + 3] = 0x40;              //  *  
+    C8_RAM[C8_FONT_7_ADDR + 4] = 0x40;              //  *  
     
-    C8_RAM[0x028] = 0xF0;           // ****
-    C8_RAM[0x029] = 0x90;           // *  *
-    C8_RAM[0x02A] = 0xF0;           // ****
-    C8_RAM[0x02B] = 0x90;           // *  *
-    C8_RAM[0x02C] = 0xF0;           // ****
+    C8_RAM[C8_FONT_8_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_8_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_8_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_8_ADDR + 3] = 0x90;              // *  *
+    C8_RAM[C8_FONT_8_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x02D] = 0xF0;           // ****
-    C8_RAM[0x02E] = 0x90;           // *  *
-    C8_RAM[0x02F] = 0xF0;           // ****
-    C8_RAM[0x030] = 0x10;           //    *
-    C8_RAM[0x031] = 0xF0;           // ****
+    C8_RAM[C8_FONT_9_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_9_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_9_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_9_ADDR + 3] = 0x10;              //    *
+    C8_RAM[C8_FONT_9_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x032] = 0xF0;           // ****
-    C8_RAM[0x033] = 0x90;           // *  *
-    C8_RAM[0x034] = 0xF0;           // ****
-    C8_RAM[0x035] = 0x90;           // *  *
-    C8_RAM[0x036] = 0x90;           // *  *
+    C8_RAM[C8_FONT_A_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_A_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_A_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_A_ADDR + 3] = 0x90;              // *  *
+    C8_RAM[C8_FONT_A_ADDR + 4] = 0x90;              // *  *
     
-    C8_RAM[0x037] = 0xE0;           // *** 
-    C8_RAM[0x038] = 0x90;           // *  *
-    C8_RAM[0x039] = 0xE0;           // *** 
-    C8_RAM[0x03A] = 0x90;           // *  *
-    C8_RAM[0x03B] = 0xE0;           // *** 
+    C8_RAM[C8_FONT_B_ADDR] = 0xE0;                  // *** 
+    C8_RAM[C8_FONT_B_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_B_ADDR + 2] = 0xE0;              // *** 
+    C8_RAM[C8_FONT_B_ADDR + 3] = 0x90;              // *  *
+    C8_RAM[C8_FONT_B_ADDR + 4] = 0xE0;              // *** 
     
-    C8_RAM[0x03C] = 0xF0;           // ****
-    C8_RAM[0x03D] = 0x80;           // *   
-    C8_RAM[0x03E] = 0x80;           // *   
-    C8_RAM[0x03F] = 0x80;           // *   
-    C8_RAM[0x040] = 0xF0;           // ****
+    C8_RAM[C8_FONT_C_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_C_ADDR + 1] = 0x80;              // *   
+    C8_RAM[C8_FONT_C_ADDR + 2] = 0x80;              // *   
+    C8_RAM[C8_FONT_C_ADDR + 3] = 0x80;              // *   
+    C8_RAM[C8_FONT_C_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x041] = 0xE0;           // *** 
-    C8_RAM[0x042] = 0x90;           // *  *
-    C8_RAM[0x043] = 0x90;           // *  *
-    C8_RAM[0x044] = 0x90;           // *  *
-    C8_RAM[0x045] = 0xE0;           // *** 
+    C8_RAM[C8_FONT_D_ADDR] = 0xE0;                  // *** 
+    C8_RAM[C8_FONT_D_ADDR + 1] = 0x90;              // *  *
+    C8_RAM[C8_FONT_D_ADDR + 2] = 0x90;              // *  *
+    C8_RAM[C8_FONT_D_ADDR + 3] = 0x90;              // *  *
+    C8_RAM[C8_FONT_D_ADDR + 4] = 0xE0;              // *** 
     
-    C8_RAM[0x046] = 0xF0;           // ****
-    C8_RAM[0x047] = 0x80;           // *   
-    C8_RAM[0x048] = 0xF0;           // ****
-    C8_RAM[0x049] = 0x80;           // *   
-    C8_RAM[0x04A] = 0xF0;           // ****
+    C8_RAM[C8_FONT_E_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_E_ADDR + 1] = 0x80;              // *   
+    C8_RAM[C8_FONT_E_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_E_ADDR + 3] = 0x80;              // *   
+    C8_RAM[C8_FONT_E_ADDR + 4] = 0xF0;              // ****
     
-    C8_RAM[0x04B] = 0xF0;           // ****
-    C8_RAM[0x04C] = 0x90;           // *   
-    C8_RAM[0x04D] = 0xF0;           // ****
-    C8_RAM[0x04E] = 0x80;           // *   
-    C8_RAM[0x04F] = 0x80;           // *   
+    C8_RAM[C8_FONT_F_ADDR] = 0xF0;                  // ****
+    C8_RAM[C8_FONT_F_ADDR + 1] = 0x80;              // *   
+    C8_RAM[C8_FONT_F_ADDR + 2] = 0xF0;              // ****
+    C8_RAM[C8_FONT_F_ADDR + 3] = 0x80;              // *   
+    C8_RAM[C8_FONT_F_ADDR + 4] = 0x80;              // *   
 }
 
 //----------------------------------------------------------------------------------
@@ -700,8 +720,45 @@ void C8_RND_VX_BYTE(C8_Instruction *instruction)
 // C8_XOR_VX_VY for more information on XOR, and secion 2.4, Display, for
 // more information on the Chip-8 screen and sprites.
 void C8_DRW_VX_VY_NIBBLE(C8_Instruction *instruction)
-{
+{    
+    // Reset the collision flag.
+    C8_V[C8_VF] = 0;
 
+    // A sprite is a group of bytes which are a binary representation of the 
+    // desired picture. Chip-8 sprites may be up to 15 bytes, for a possible 
+    // sprite size of 8x15.
+    unsigned char sprite[0xF];    
+    for (unsigned char i = 0; i < instruction->n; i++)
+    {
+        sprite[i] = C8_RAM[C8_I + i];
+    }
+    
+    for (unsigned char y = 0; y < instruction->n; y++)
+    {
+        unsigned char ypos = C8_V[instruction->y] + y;
+        if (ypos > C8_HEIGHT)
+        {
+            ypos -= C8_HEIGHT;
+        }
+        
+        for (unsigned char x = 0; x < 8; x++)
+        {
+            unsigned char xpos = C8_V[instruction->x] + x;
+            if (xpos > C8_WIDTH)
+            {
+                xpos -= C8_WIDTH;
+            }
+            
+            if ((sprite[y] & 0x80) > 0)
+            {
+                bool bit = (C8_Buffer[ypos][xpos]) ^ (sprite[y] >> x);
+                C8_V[C8_VF] = !bit;
+                C8_Buffer[ypos][xpos] = bit;
+            }
+
+            sprite[y] = sprite[y] << 1;
+        }
+    }
 }
 
 // Skip next instruction if key with the value of Vx is pressed.
@@ -785,7 +842,10 @@ void C8_LD_B_VX(C8_Instruction *instruction)
 // memory, starting at the address in I.
 void C8_LD_I_VX(C8_Instruction *instruction)
 {
-
+    for (int i = C8_V0; i <= instruction->x; i++)
+    {
+        C8_RAM[C8_I + i] = C8_V[i];
+    }
 }
 
 // Read registers V0 through Vx from memory starting at location I.
@@ -804,82 +864,37 @@ void C8_LD_VX_I(C8_Instruction *instruction)
 // Follows Testing-Only Functions
 //----------------------------------------------------------------------------------
 
-// Uses the C8_DRW_VX_VY_NIBBLE() function to draw the hexfont sprites to screen buffer.
-void hexfont()
+void test_draw_font(unsigned char font, unsigned char xpos, unsigned char ypos)
 {
-    
+    C8_I = font;
+    current_instruction.n = 5;
+    current_instruction.x = 0;
+    current_instruction.y = 1;
+    C8_V[0] = xpos;
+    C8_V[1] = ypos;
+    C8_DRW_VX_VY_NIBBLE(&current_instruction);
 }
 
-// Prints some "HELLOWORLD" text on into the screen buffer.
-void helloworld()
-{
-    // H
-    C8_Buffer[1][1] = true; C8_Buffer[1][2] = false; C8_Buffer[1][3] = true;
-    C8_Buffer[2][1] = true; C8_Buffer[2][2] = false; C8_Buffer[2][3] = true;
-    C8_Buffer[3][1] = true; C8_Buffer[3][2] = true;  C8_Buffer[3][3] = true;
-    C8_Buffer[4][1] = true; C8_Buffer[4][2] = false; C8_Buffer[4][3] = true;
-    C8_Buffer[5][1] = true; C8_Buffer[5][2] = false; C8_Buffer[5][3] = true; 
+// Uses the C8_DRW_VX_VY_NIBBLE() function to draw the hexfont sprites to screen buffer.
+void test_font()
+{    
+    test_draw_font(C8_FONT_0_ADDR, 1, 1);
+    test_draw_font(C8_FONT_1_ADDR, 6, 1);
+    test_draw_font(C8_FONT_2_ADDR, 11, 1);
+    test_draw_font(C8_FONT_3_ADDR, 16, 1);
 
-    // E
-    C8_Buffer[1][5] = true; C8_Buffer[1][6] = true;  C8_Buffer[1][7] = true;
-    C8_Buffer[2][5] = true; C8_Buffer[2][6] = false; C8_Buffer[2][7] = false;
-    C8_Buffer[3][5] = true; C8_Buffer[3][6] = true;  C8_Buffer[3][7] = true;
-    C8_Buffer[4][5] = true; C8_Buffer[4][6] = false; C8_Buffer[4][7] = false;
-    C8_Buffer[5][5] = true; C8_Buffer[5][6] = true;  C8_Buffer[5][7] = true; 
-
-    // L
-    C8_Buffer[1][9] = true; C8_Buffer[1][10] = false; C8_Buffer[1][11] = false;
-    C8_Buffer[2][9] = true; C8_Buffer[2][10] = false; C8_Buffer[2][11] = false;
-    C8_Buffer[3][9] = true; C8_Buffer[3][10] = false; C8_Buffer[3][11] = false;
-    C8_Buffer[4][9] = true; C8_Buffer[4][10] = false; C8_Buffer[4][11] = false;
-    C8_Buffer[5][9] = true; C8_Buffer[5][10] = true;  C8_Buffer[5][11] = true; 
-
-    // L
-    C8_Buffer[1][13] = true; C8_Buffer[1][14] = false; C8_Buffer[1][15] = false;
-    C8_Buffer[2][13] = true; C8_Buffer[2][14] = false; C8_Buffer[2][15] = false;
-    C8_Buffer[3][13] = true; C8_Buffer[3][14] = false; C8_Buffer[3][15] = false;
-    C8_Buffer[4][13] = true; C8_Buffer[4][14] = false; C8_Buffer[4][15] = false;
-    C8_Buffer[5][13] = true; C8_Buffer[5][14] = true;  C8_Buffer[5][15] = true; 
-
-    // O
-    C8_Buffer[1][17] = true; C8_Buffer[1][18] = true;  C8_Buffer[1][19] = true;
-    C8_Buffer[2][17] = true; C8_Buffer[2][18] = false; C8_Buffer[2][19] = true;
-    C8_Buffer[3][17] = true; C8_Buffer[3][18] = false; C8_Buffer[3][19] = true;
-    C8_Buffer[4][17] = true; C8_Buffer[4][18] = false; C8_Buffer[4][19] = true;
-    C8_Buffer[5][17] = true; C8_Buffer[5][18] = true;  C8_Buffer[5][19] = true; 
-
-    // W
-    C8_Buffer[1][21] = true; C8_Buffer[1][22] = false; C8_Buffer[1][23] = true;
-    C8_Buffer[2][21] = true; C8_Buffer[2][22] = false; C8_Buffer[2][23] = true;
-    C8_Buffer[3][21] = true; C8_Buffer[3][22] = false; C8_Buffer[3][23] = true;
-    C8_Buffer[4][21] = true; C8_Buffer[4][22] = true;  C8_Buffer[4][23] = true;
-    C8_Buffer[5][21] = true; C8_Buffer[5][22] = false; C8_Buffer[5][23] = true; 
-
-    // O
-    C8_Buffer[1][25] = true; C8_Buffer[1][26] = true;  C8_Buffer[1][27] = true;
-    C8_Buffer[2][25] = true; C8_Buffer[2][26] = false; C8_Buffer[2][27] = true;
-    C8_Buffer[3][25] = true; C8_Buffer[3][26] = false; C8_Buffer[3][27] = true;
-    C8_Buffer[4][25] = true; C8_Buffer[4][26] = false; C8_Buffer[4][27] = true;
-    C8_Buffer[5][25] = true; C8_Buffer[5][26] = true;  C8_Buffer[5][27] = true; 
-
-    // R
-    C8_Buffer[1][29] = true; C8_Buffer[1][30] = true;  C8_Buffer[1][31] = false;
-    C8_Buffer[2][29] = true; C8_Buffer[2][30] = false; C8_Buffer[2][31] = true;
-    C8_Buffer[3][29] = true; C8_Buffer[3][30] = true;  C8_Buffer[3][31] = false;
-    C8_Buffer[4][29] = true; C8_Buffer[4][30] = false; C8_Buffer[4][31] = true;
-    C8_Buffer[5][29] = true; C8_Buffer[5][30] = false; C8_Buffer[5][31] = true; 
-
-    // L
-    C8_Buffer[1][33] = true; C8_Buffer[1][34] = false; C8_Buffer[1][35] = false;
-    C8_Buffer[2][33] = true; C8_Buffer[2][34] = false; C8_Buffer[2][35] = false;
-    C8_Buffer[3][33] = true; C8_Buffer[3][34] = false; C8_Buffer[3][35] = false;
-    C8_Buffer[4][33] = true; C8_Buffer[4][34] = false; C8_Buffer[4][35] = false;
-    C8_Buffer[5][33] = true; C8_Buffer[5][34] = true;  C8_Buffer[5][35] = true; 
-
-    // O
-    C8_Buffer[1][37] = true; C8_Buffer[1][38] = true;  C8_Buffer[1][39] = false;
-    C8_Buffer[2][37] = true; C8_Buffer[2][38] = false; C8_Buffer[2][39] = true;
-    C8_Buffer[3][37] = true; C8_Buffer[3][38] = false; C8_Buffer[3][39] = true;
-    C8_Buffer[4][37] = true; C8_Buffer[4][38] = false; C8_Buffer[4][39] = true;
-    C8_Buffer[5][37] = true; C8_Buffer[5][38] = true;  C8_Buffer[5][39] = false; 
+    test_draw_font(C8_FONT_4_ADDR, 1, 7);
+    test_draw_font(C8_FONT_5_ADDR, 6, 7);
+    test_draw_font(C8_FONT_6_ADDR, 11, 7);
+    test_draw_font(C8_FONT_7_ADDR, 16, 7);
+    
+    test_draw_font(C8_FONT_8_ADDR, 1, 13);
+    test_draw_font(C8_FONT_9_ADDR, 6, 13);
+    test_draw_font(C8_FONT_A_ADDR, 11, 13);
+    test_draw_font(C8_FONT_B_ADDR, 16, 13);
+    
+    test_draw_font(C8_FONT_C_ADDR, 1, 19);
+    test_draw_font(C8_FONT_D_ADDR, 6, 19);
+    test_draw_font(C8_FONT_E_ADDR, 11, 19);
+    test_draw_font(C8_FONT_F_ADDR, 16, 19);
 }

@@ -11,6 +11,8 @@
 	"files.associations": {
 		".fantomasignore": "ignore",
 		"stdio.h": "c",
-		"limits": "c"
+		"limits": "c",
+		"stdlib.h": "c",
+		"*.m": "c"
 	}
 }
