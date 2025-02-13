@@ -49,7 +49,7 @@
 typedef struct C8_Instruction
 {
     unsigned short opcode;
-    unsigned char addr;
+    unsigned short addr;
     unsigned char msn;
     unsigned char n;
     unsigned char x;
@@ -114,7 +114,7 @@ bool C8_Buffer[C8_HEIGHT][C8_WIDTH]       = {false};
 bool C8_Keyboard[0xF]                     = {0};
 
 // Somewhere to store the current instruction.
-C8_Instruction current_instruction        = {0};
+C8_Instruction current_instruction;
 
 //----------------------------------------------------------------------------------
 // Chip-8 Instruction Set Declaration
@@ -182,12 +182,14 @@ int main()
     load_hexfont_sprites();
     load_rom();
 
-    test_font();
+    // test_font();
 
     //--------------------------------------------------------------------------------------
     // Main Game Loop
     while (!WindowShouldClose())
     {
+        memset(&current_instruction, 0, sizeof(C8_Instruction));
+
         read_input();
         
         parse_instruction(&current_instruction);
@@ -284,7 +286,7 @@ void parse_instruction(C8_Instruction *instruction)
     // instructions following it will be properly situated in RAM.
     unsigned char first_byte        = C8_RAM[C8_PC];
     unsigned char second_byte       = C8_RAM[C8_PC + 1];
-    unsigned short opcode           = first_byte << 8 | second_byte;
+    unsigned short opcode           = (first_byte << 8) | second_byte;
 
     instruction->opcode             = opcode;
 
@@ -309,13 +311,13 @@ void parse_instruction(C8_Instruction *instruction)
 
 void increment_program_counter(C8_Instruction *instruction)
 {
-    if (!instruction->skip)
+    if (instruction->skip > 0)
     {
-        C8_PC += 2;
+        instruction->skip = 0;
     }
     else
     {
-        instruction->skip -= 1;
+        C8_PC += 2;
     }
 }
 
@@ -516,8 +518,21 @@ void C8_CLS(C8_Instruction *instruction)
 // the stack, then subtracts 1 from the stack pointer.
 void C8_RET(C8_Instruction *instruction)
 {
-    C8_PC = C8_STACK[C8_SP];
     C8_SP -= 1;
+
+    // So, I guess we should handle this manually like in C8_CALL_ADDR?
+    // If the stack pointer drops below zero, it will wrap-around back
+    // to value higher than is possible/expected because it is unsigned.
+    // If that's the case, the pointer will be greater than our stack size
+    // and we'll potentially open ourselves up writing memory out of bounds?
+    // So, if the decrement of the pointer wraps around taking us back 
+    // over the stack size, then adjust again?
+    if (C8_SP >= C8_STACK_SIZE)
+    {
+        C8_SP -= C8_STACK_SIZE;
+    }
+
+    C8_PC = C8_STACK[C8_SP];
 }
 
 // Jump to location nnn.
@@ -532,9 +547,25 @@ void C8_JP_ADDR(C8_Instruction *instruction)
 // PC on top of the stack. The PC is then set to nnn.
 void C8_CALL_ADDR(C8_Instruction *instruction)
 {
-    C8_SP += 1;
+    // We're incrementing this value by 1 - but the data type behind
+    // it can go past the stack size of 16 significantly. This causes
+    // us to break past the initial bounds of the stack and causes
+    // adjacent memory (i.e.: our buffer array) to corrupt.
+    // TODO: Can we build a new 4-bit type that will wrap around
+    // itself? In theory, if it did it is kind of a bug in the game
+    // because game code shouldn't allow the stack to go beyond 16 
+    // levels of depth, right? But, I want to handle it (perhaps making
+    // a different bug!)
     C8_STACK[C8_SP] = C8_PC;
+
+    C8_SP += 1;
+    if (C8_SP >= C8_STACK_SIZE)
+    {
+        C8_SP -= C8_STACK_SIZE;
+    }
+    
     C8_PC = instruction->addr;
+    instruction->skip = 1;
 }
 
 // Skip next instruction if Vx = kk.
@@ -825,7 +856,7 @@ void C8_ADD_I_VX(C8_Instruction *instruction)
 // information on the Chip-8 hexedecimal font.
 void C8_LD_F_VX(C8_Instruction *instruction)
 {
-
+    C8_I = C8_V[instruction->x];
 }
 
 // Store BCD represnetation of Vx in memory locations I, I+1, and I+2.
@@ -834,7 +865,10 @@ void C8_LD_F_VX(C8_Instruction *instruction)
 // the ones digit at location I+2.
 void C8_LD_B_VX(C8_Instruction *instruction)
 {
-
+    unsigned char vx    = C8_V[instruction->x];
+    C8_RAM[C8_I]        = vx / 100;
+    C8_RAM[C8_I + 1]    = (vx / 10) % 10;
+    C8_RAM[C8_I + 2]    = vx % 10;
 }
 
 // Store registers V0 through Vx in memory starting at location I.
