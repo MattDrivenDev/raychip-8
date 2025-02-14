@@ -26,6 +26,7 @@
 #define C8_PIXEL_HEIGHT         10
 #define C8_VF                   15
 #define C8_V0                   0
+#define C8_CLOCK_SPEED          500
 
 #define C8_FONT_0_ADDR          0x000
 #define C8_FONT_1_ADDR          0x005
@@ -113,9 +114,6 @@ bool C8_Buffer[C8_HEIGHT][C8_WIDTH]       = {false};
 
 // The computers which originally used the Chip-8 Language had a 16-key hexadecimal keypad.
 bool C8_Keyboard[0xF]                     = {0};
-
-// Somewhere to store the current instruction.
-C8_Instruction current_instruction;
 
 //----------------------------------------------------------------------------------
 // Chip-8 Instruction Set Declaration
@@ -258,28 +256,45 @@ int main()
     //--------------------------------------------------------------------------------------
     const int screenWidth       = C8_WIDTH * C8_PIXEL_WIDTH;
     const int screenHeight      = C8_HEIGHT * C8_PIXEL_HEIGHT;
+    const float cycleTime       = 1.0f / C8_CLOCK_SPEED;
+    const float frameTime       = 1.0f / 60; // 60 fps
+
     InitWindow(screenWidth, screenHeight, "raychip-8");  
-    SetTargetFPS(60);      
+
     
     initialize_instruction_set();
     load_hexfont_sprites();
     load_rom();
+    
+    float lastCycleTime = 0.0f;
+    float lastFrameTime = 0.0f;
+    C8_Instruction current_instruction;
 
     //--------------------------------------------------------------------------------------
     // Main Game Loop
     while (!WindowShouldClose())
     {
-        memset(&current_instruction, 0, sizeof(C8_Instruction));
+        float time = GetTime();       
 
         read_input();
         
-        parse_instruction(&current_instruction);
+        if (time - lastCycleTime >= cycleTime)
+        {
+            lastCycleTime = time;
 
-        execute_instruction(&current_instruction);
+            parse_instruction(&current_instruction);
 
-        increment_program_counter(&current_instruction);
+            execute_instruction(&current_instruction);
 
-        render_buffer();
+            increment_program_counter(&current_instruction);
+        }
+
+        if (time - lastFrameTime >= frameTime)
+        {
+            lastFrameTime = time;
+
+            render_buffer();
+        }
     }
 
     // De-Initialization
@@ -928,37 +943,39 @@ void C8_LD_VX_I(C8_Instruction *instruction)
 // Follows Testing-Only Functions
 //----------------------------------------------------------------------------------
 
-void test_draw_font(unsigned char font, unsigned char xpos, unsigned char ypos)
+void test_draw_font(C8_Instruction *instruction, char font, unsigned char xpos, unsigned char ypos)
 {
     C8_I = font;
-    current_instruction.n = 5;
-    current_instruction.x = 0;
-    current_instruction.y = 1;
+    instruction->n = 5;
+    instruction->x = 0;
+    instruction->y = 1;
     C8_V[0] = xpos;
     C8_V[1] = ypos;
-    C8_DRW_VX_VY_NIBBLE(&current_instruction);
+    C8_DRW_VX_VY_NIBBLE(instruction);
 }
 
 // Uses the C8_DRW_VX_VY_NIBBLE() function to draw the hexfont sprites to screen buffer.
 void test_font()
 {    
-    test_draw_font(C8_FONT_0_ADDR, 1, 1);
-    test_draw_font(C8_FONT_1_ADDR, 6, 1);
-    test_draw_font(C8_FONT_2_ADDR, 11, 1);
-    test_draw_font(C8_FONT_3_ADDR, 16, 1);
+    C8_Instruction test_instruction = {0};
 
-    test_draw_font(C8_FONT_4_ADDR, 1, 7);
-    test_draw_font(C8_FONT_5_ADDR, 6, 7);
-    test_draw_font(C8_FONT_6_ADDR, 11, 7);
-    test_draw_font(C8_FONT_7_ADDR, 16, 7);
-    
-    test_draw_font(C8_FONT_8_ADDR, 1, 13);
-    test_draw_font(C8_FONT_9_ADDR, 6, 13);
-    test_draw_font(C8_FONT_A_ADDR, 11, 13);
-    test_draw_font(C8_FONT_B_ADDR, 16, 13);
-    
-    test_draw_font(C8_FONT_C_ADDR, 1, 19);
-    test_draw_font(C8_FONT_D_ADDR, 6, 19);
-    test_draw_font(C8_FONT_E_ADDR, 11, 19);
-    test_draw_font(C8_FONT_F_ADDR, 16, 19);
+    test_draw_font(&test_instruction, C8_FONT_0_ADDR, 1, 1);
+    test_draw_font(&test_instruction, C8_FONT_1_ADDR, 6, 1);
+    test_draw_font(&test_instruction, C8_FONT_2_ADDR, 11, 1);
+    test_draw_font(&test_instruction, C8_FONT_3_ADDR, 16, 1);
+
+    test_draw_font(&test_instruction, C8_FONT_4_ADDR, 1, 7);
+    test_draw_font(&test_instruction, C8_FONT_5_ADDR, 6, 7);
+    test_draw_font(&test_instruction, C8_FONT_6_ADDR, 11, 7);
+    test_draw_font(&test_instruction, C8_FONT_7_ADDR, 16, 7);
+ 
+    test_draw_font(&test_instruction, C8_FONT_8_ADDR, 1, 13);
+    test_draw_font(&test_instruction, C8_FONT_9_ADDR, 6, 13);
+    test_draw_font(&test_instruction, C8_FONT_A_ADDR, 11, 13);
+    test_draw_font(&test_instruction, C8_FONT_B_ADDR, 16, 13);
+ 
+    test_draw_font(&test_instruction, C8_FONT_C_ADDR, 1, 19);
+    test_draw_font(&test_instruction, C8_FONT_D_ADDR, 6, 19);
+    test_draw_font(&test_instruction, C8_FONT_E_ADDR, 11, 19);
+    test_draw_font(&test_instruction, C8_FONT_F_ADDR, 16, 19);
 }
