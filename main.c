@@ -14,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "4-flags.ch8"
+#define C8_FILENAME             "6-keypad.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
@@ -156,6 +156,87 @@ void C8_LD_B_VX                 (C8_Instruction *instruction);
 void C8_LD_I_VX                 (C8_Instruction *instruction);
 void C8_LD_VX_I                 (C8_Instruction *instruction);
 
+// Oh, this is interesting!
+// Function pointers in Arrays!?
+// Apparently, this is more performant than using a switch-statement.
+// Put the instructions into Function Pointer Table(s)
+void (*instruction_table[16])(C8_Instruction *instruction)              = {0};
+void (*instruction_0x0_subtable[256])(C8_Instruction *instruction)      = {0};
+void (*instruction_0x8_subtable[16])(C8_Instruction *instruction)       = {0};
+void (*instruction_0xE_subtable[256])(C8_Instruction *instruction)      = {0};
+void (*instruction_0xF_subtable[256])(C8_Instruction *instruction)      = {0};
+
+void execute_0x0_instruction(C8_Instruction *instruction)
+{
+    instruction_0x0_subtable[instruction->kk](instruction);
+}
+
+void execute_0x8_instruction(C8_Instruction *instruction)
+{
+    instruction_0x8_subtable[instruction->n](instruction);
+}
+
+void execute_0xE_instruction(C8_Instruction *instruction)
+{
+    instruction_0xE_subtable[instruction->kk](instruction);
+}
+
+void execute_0xF_instruction(C8_Instruction *instruction)
+{
+    instruction_0xF_subtable[instruction->kk](instruction);
+}
+
+void execute_instruction(C8_Instruction *instruction)
+{
+    instruction_table[instruction->msn](instruction);
+}
+
+void initialize_instruction_set()
+{
+    instruction_0x0_subtable[0xE0] = C8_CLS;
+    instruction_0x0_subtable[0xEE] = C8_RET;
+
+    instruction_0x8_subtable[0x0] = C8_LD_VX_VY;
+    instruction_0x8_subtable[0x1] = C8_OR_VX_VY;  
+    instruction_0x8_subtable[0x2] = C8_AND_VX_VY;        
+    instruction_0x8_subtable[0x3] = C8_XOR_VX_VY;  
+    instruction_0x8_subtable[0x4] = C8_ADD_VX_VY;  
+    instruction_0x8_subtable[0x5] = C8_SUB_VX_VY;  
+    instruction_0x8_subtable[0x6] = C8_SHR_VX_VY;  
+    instruction_0x8_subtable[0x7] = C8_SUBN_VX_VY;  
+    instruction_0x8_subtable[0xE] = C8_SHL_VX_VY;  
+
+    instruction_0xE_subtable[0x9E] = C8_SKP_VX;
+    instruction_0xE_subtable[0xA1] = C8_SKNP_VX;
+
+    instruction_0xF_subtable[0x07] = C8_LD_VX_DT;    
+    instruction_0xF_subtable[0x0A] = C8_LD_VX_K;    
+    instruction_0xF_subtable[0x15] = C8_LD_DT_VX;    
+    instruction_0xF_subtable[0x18] = C8_LD_ST_VX;    
+    instruction_0xF_subtable[0x1E] = C8_ADD_I_VX;    
+    instruction_0xF_subtable[0x29] = C8_LD_F_VX;    
+    instruction_0xF_subtable[0x33] = C8_LD_B_VX;    
+    instruction_0xF_subtable[0x55] = C8_LD_I_VX;    
+    instruction_0xF_subtable[0x65] = C8_LD_VX_I;     
+    
+    instruction_table[0x0] = execute_0x0_instruction;
+    instruction_table[0x1] = C8_JP_ADDR;
+    instruction_table[0x2] = C8_CALL_ADDR;
+    instruction_table[0x3] = C8_SE_VX_BYTE;
+    instruction_table[0x4] = C8_SNE_VX_BYTE;
+    instruction_table[0x5] = C8_SE_VX_VY;
+    instruction_table[0x6] = C8_LD_VX_BYTE;
+    instruction_table[0x7] = C8_ADD_VX_BYTE;
+    instruction_table[0x8] = execute_0x8_instruction;
+    instruction_table[0x9] = C8_SNE_VX_VY;
+    instruction_table[0xA] = C8_LD_I_ADDR;
+    instruction_table[0xB] = C8_JP_V0_ADDR;
+    instruction_table[0xC] = C8_RND_VX_BYTE;
+    instruction_table[0xD] = C8_DRW_VX_VY_NIBBLE;
+    instruction_table[0xE] = execute_0xE_instruction;
+    instruction_table[0xF] = execute_0xF_instruction;
+}
+
 //----------------------------------------------------------------------------------
 // Local Functions Declaration
 //----------------------------------------------------------------------------------
@@ -180,10 +261,9 @@ int main()
     InitWindow(screenWidth, screenHeight, "raychip-8");  
     SetTargetFPS(60);      
     
+    initialize_instruction_set();
     load_hexfont_sprites();
     load_rom();
-
-    // test_font();
 
     //--------------------------------------------------------------------------------------
     // Main Game Loop
@@ -195,7 +275,7 @@ int main()
         
         parse_instruction(&current_instruction);
 
-        interpret_instruction(&current_instruction);
+        execute_instruction(&current_instruction);
 
         increment_program_counter(&current_instruction);
 
@@ -208,72 +288,6 @@ int main()
     //--------------------------------------------------------------------------------------
 
     return 0;
-}
-
-void interpret_instruction(C8_Instruction *instruction)
-{
-    switch (instruction->msn)
-    {
-        case 0x0:
-            switch (instruction->kk)
-            {
-                case 0xE0:  C8_CLS(instruction);                    break;
-                case 0xEE:  C8_RET(instruction);                    break;        
-                default:    C8_SYS_ADDR(instruction);               break;
-            }
-            break;
-        case 0x1:       C8_JP_ADDR(instruction);                    break;
-        case 0x2:       C8_CALL_ADDR(instruction);                  break;
-        case 0x3:       C8_SE_VX_BYTE(instruction);                 break;
-        case 0x4:       C8_SNE_VX_BYTE(instruction);                break;
-        case 0x5:       C8_SE_VX_VY(instruction);                   break;
-        case 0x6:       C8_LD_VX_BYTE(instruction);                 break;
-        case 0x7:       C8_ADD_VX_BYTE(instruction);                break;
-        case 0x8:
-            switch (instruction->n)
-            {
-                case 0x0:   C8_LD_VX_VY(instruction);               break;
-                case 0x1:   C8_OR_VX_VY(instruction);               break;  
-                case 0x2:   C8_AND_VX_VY(instruction);              break;        
-                case 0x3:   C8_XOR_VX_VY(instruction);              break;  
-                case 0x4:   C8_ADD_VX_VY(instruction);              break;  
-                case 0x5:   C8_SUB_VX_VY(instruction);              break;  
-                case 0x6:   C8_SHR_VX_VY(instruction);              break;  
-                case 0x7:   C8_SUBN_VX_VY(instruction);             break;  
-                case 0xE:   C8_SHL_VX_VY(instruction);              break;  
-                default:    TraceLog(LOG_ERROR, "Unknown");         break;
-            }
-            break;
-        case 0x9:       C8_SNE_VX_VY(instruction);                  break;
-        case 0xA:       C8_LD_I_ADDR(instruction);                  break;
-        case 0xB:       C8_JP_V0_ADDR(instruction);                 break;
-        case 0xC:       C8_RND_VX_BYTE(instruction);                break;
-        case 0xD:       C8_DRW_VX_VY_NIBBLE(instruction);           break;
-        case 0xE:
-            switch (instruction->kk)
-            {
-                case 0x9E:  C8_SKP_VX(instruction);                 break;
-                case 0xA1:  C8_SKNP_VX(instruction);                break;
-                default:    TraceLog(LOG_ERROR, "Unknown");         break;
-            }
-            break;
-        case 0xF:
-            switch (instruction->kk)
-            {
-                case 0x07:  C8_LD_VX_DT(instruction);               break;    
-                case 0x0A:  C8_LD_VX_K(instruction);                break;    
-                case 0x15:  C8_LD_DT_VX(instruction);               break;    
-                case 0x18:  C8_LD_ST_VX(instruction);               break;    
-                case 0x1E:  C8_ADD_I_VX(instruction);               break;    
-                case 0x29:  C8_LD_F_VX(instruction);                break;    
-                case 0x33:  C8_LD_B_VX(instruction);                break;    
-                case 0x55:  C8_LD_I_VX(instruction);                break;    
-                case 0x65:  C8_LD_VX_I(instruction);                break;                              
-                default:    TraceLog(LOG_ERROR, "Unknown");         break;
-            }
-            break;
-        default:            TraceLog(LOG_ERROR, "Unknown");         break;
-    }
 }
 
 void parse_instruction(C8_Instruction *instruction)
@@ -348,17 +362,14 @@ void load_rom()
 void render_buffer()
 {
     BeginDrawing();
-    ClearBackground(BLACK);
     for (int i = 0; i < C8_HEIGHT; i++)
     {
         for (int j = 0; j < C8_WIDTH; j++)
         {
-            if (C8_Buffer[i][j])
-            {
-                int x = j * C8_PIXEL_WIDTH;
-                int y = i * C8_PIXEL_HEIGHT;
-                DrawRectangle(x, y, C8_PIXEL_WIDTH, C8_PIXEL_HEIGHT, GREEN);
-            }
+            int x = j * C8_PIXEL_WIDTH;
+            int y = i * C8_PIXEL_HEIGHT;
+            Color pixel_color = C8_Buffer[i][j] ? GREEN : BLACK;
+            DrawRectangle(x, y, C8_PIXEL_WIDTH, C8_PIXEL_HEIGHT, pixel_color);
         }
     }    
     EndDrawing();
@@ -370,10 +381,10 @@ void read_input()
     // I suspect that some kind of hashtable that marries the raylib key
     // enum to the correct key - and then we can check the IsKeyDown
     // for each.
-    C8_Keyboard[0x0] = IsKeyDown(KEY_ZERO);
     C8_Keyboard[0x1] = IsKeyDown(KEY_ONE);
     C8_Keyboard[0x2] = IsKeyDown(KEY_TWO);
-    C8_Keyboard[0xC] = IsKeyDown(KEY_FOUR);
+    C8_Keyboard[0x3] = IsKeyDown(KEY_THREE);
+    C8_Keyboard[0xC] = IsKeyDown(KEY_C);
 
     C8_Keyboard[0x4] = IsKeyDown(KEY_Q);
     C8_Keyboard[0x5] = IsKeyDown(KEY_W);
