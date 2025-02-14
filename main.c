@@ -718,11 +718,10 @@ void C8_SUBN_VX_VY(C8_Instruction *instruction)
 // If the most-significant bit of Vx is 1, then VF is set to 1 otherwise 0.
 // Then Vx is multiplied by 2.
 void C8_SHL_VX_VY(C8_Instruction *instruction)
-{
-    // TODO I think this will work but I wonder if there is a bitwise 
-    // operation that will work better.
-    C8_V[C8_VF] = C8_V[instruction->x] > 128;
+{    
+    unsigned char vf = C8_V[instruction->x] > 128;
     C8_V[instruction->x] = C8_V[instruction->x] * 2;
+    C8_V[C8_VF] = vf;
 }
 
 // Skip next instruction if Vx != Vy.
