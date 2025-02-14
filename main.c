@@ -14,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "1-chip8-logo.ch8"
+#define C8_FILENAME             "rom.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
@@ -541,6 +541,7 @@ void C8_RET(C8_Instruction *instruction)
 void C8_JP_ADDR(C8_Instruction *instruction)
 {
     C8_PC = instruction->addr;
+    instruction->skip = 1;
 }
 
 // Call subroutine at nnn.
