@@ -1,7 +1,8 @@
 /*
-    Author: Matt Ball
-    GitHub: https://github.com/MattDrivenDev/raychip-8
-    Documentation: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+    Author:         Matt Ball
+    GitHub:         https://github.com/MattDrivenDev/raychip-8
+    Documentation:  http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+    Tested With:    https://github.com/Timendus/chip8-test-suite?tab=readme-ov-file#chip-8-test-suite
 */
 
 #include <raylib.h>
@@ -13,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "rom.c8"
+#define C8_FILENAME             "1-chip8-logo.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
