@@ -14,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "rom.ch8"
+#define C8_FILENAME             "4-flags.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
@@ -661,10 +661,11 @@ void C8_XOR_VX_VY(C8_Instruction *instruction)
 // 8 bits of the result are kept, and stored in Vx.
 void C8_ADD_VX_VY(C8_Instruction *instruction)
 {
-    short vx = C8_V[instruction->x] + C8_V[instruction->y];
-    // TODO is this right?
-    C8_V[C8_VF] = vx > sizeof(char);
-    C8_V[instruction->x] = vx;
+    C8_V[instruction->x] += C8_V[instruction->y];
+
+    // If the new value of vx is less than one of the sides of the addition
+    // then our unsigned char has wrapped around and we can set the carry.
+    C8_V[C8_VF] = C8_V[instruction->x] < C8_V[instruction->y];
 }
 
 // Set Vx = Vx - Vy, set VF = NOT borrow.
@@ -672,8 +673,16 @@ void C8_ADD_VX_VY(C8_Instruction *instruction)
 // from Vx, and the result stored in Vx.
 void C8_SUB_VX_VY(C8_Instruction *instruction)
 {
-    C8_V[C8_VF] = C8_V[instruction->x] > C8_V[instruction->y];
-    C8_V[instruction->x] = C8_V[instruction->x] - C8_V[instruction->y];
+    unsigned char borrow = 0;
+    if (C8_V[instruction->x] >= C8_V[instruction->y])
+    {
+        borrow = 1;
+    }
+
+    unsigned char vx = C8_V[instruction->x] - C8_V[instruction->y];
+    
+    C8_V[instruction->x] = vx;
+    C8_V[C8_VF] = borrow;
 }
 
 // Set Vx = Vx SHR 1.
