@@ -701,8 +701,16 @@ void C8_SHR_VX_VY(C8_Instruction *instruction)
 // from Vy, and the results are stored in Vx.
 void C8_SUBN_VX_VY(C8_Instruction *instruction)
 {
-    C8_V[C8_VF] = C8_V[instruction->y] > C8_V[instruction->x];
-    C8_V[instruction->x] = C8_V[instruction->y] - C8_V[instruction->x];
+    unsigned char borrow = 0;
+    if (C8_V[instruction->y] >= C8_V[instruction->x])
+    {
+        borrow = 1;
+    }
+
+    unsigned char vx = C8_V[instruction->y] - C8_V[instruction->x];
+    
+    C8_V[instruction->x] = vx;
+    C8_V[C8_VF] = borrow;
 }
 
 // Set Vx = Vx SHL 1.
