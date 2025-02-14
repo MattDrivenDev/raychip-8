@@ -692,8 +692,9 @@ void C8_SHR_VX_VY(C8_Instruction *instruction)
 {
     // TODO I think this will work but I wonder if there is a bitwise 
     // operation that will work better.
-    C8_V[C8_VF] = C8_V[instruction->x] % 2;
+    unsigned char vf = C8_V[instruction->x] % 2;
     C8_V[instruction->x] = C8_V[instruction->x] / 2;
+    C8_V[C8_VF] = vf;
 }
 
 // Set Vx = Vy - Vx, set VF = NOT borrow.
