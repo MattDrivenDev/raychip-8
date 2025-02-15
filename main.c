@@ -14,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "6-keypad.ch8"
+#define C8_FILENAME             "7-beep.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
@@ -27,6 +27,7 @@
 #define C8_VF                   15
 #define C8_V0                   0
 #define C8_CLOCK_SPEED          500
+#define C8_TIMER_SPEED    60
 
 #define C8_FONT_0_ADDR          0x000
 #define C8_FONT_1_ADDR          0x005
@@ -258,9 +259,10 @@ int main()
     const int screenHeight      = C8_HEIGHT * C8_PIXEL_HEIGHT;
     const float cycleTime       = 1.0f / C8_CLOCK_SPEED;
     const float frameTime       = 1.0f / 60; // 60 fps
+    const float timerTime       = 1.0f / C8_TIMER_SPEED;
 
     InitWindow(screenWidth, screenHeight, "raychip-8");  
-
+    InitAudioDevice();
     
     initialize_instruction_set();
     load_hexfont_sprites();
@@ -268,7 +270,10 @@ int main()
     
     float lastCycleTime = 0.0f;
     float lastFrameTime = 0.0f;
+    float lastTimerTime = 0.0f;
     C8_Instruction current_instruction;
+    Wave wav = LoadWave("sound.wav");
+    Sound sound = LoadSoundFromWave(wav);
 
     //--------------------------------------------------------------------------------------
     // Main Game Loop
@@ -295,10 +300,38 @@ int main()
 
             render_buffer();
         }
+
+        if (time - lastTimerTime >= timerTime)
+        {
+            lastTimerTime = time;
+
+            if (C8_DT > 0) 
+            {
+                C8_DT--;
+            }
+
+            if (C8_ST > 0)
+            {
+                if (!IsSoundPlaying(sound))
+                {
+                    PlaySound(sound);
+                }
+
+                C8_ST--;
+            }
+            else 
+            {
+                if (IsSoundPlaying(sound))
+                {
+                    StopSound(sound);
+                }
+            }
+        }
     }
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
+    CloseAudioDevice();
     CloseWindow();                  // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
