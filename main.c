@@ -14,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "7-beep.ch8"
+#define C8_FILENAME             "4-flags.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
@@ -833,39 +833,45 @@ void C8_DRW_VX_VY_NIBBLE(C8_Instruction *instruction)
     // Reset the collision flag.
     C8_V[C8_VF] = 0;
 
-    // A sprite is a group of bytes which are a binary representation of the 
-    // desired picture. Chip-8 sprites may be up to 15 bytes, for a possible 
-    // sprite size of 8x15.
-    unsigned char sprite[0xF];    
-    for (unsigned char i = 0; i < instruction->n; i++)
-    {
-        sprite[i] = C8_RAM[C8_I + i];
-    }
-    
+    // The "height" of the pixel (aka number of bytes is the value of nibble)
     for (unsigned char y = 0; y < instruction->n; y++)
-    {
+    {        
         unsigned char ypos = C8_V[instruction->y] + y;
-        if (ypos > C8_HEIGHT)
+
+        // Vertical wrapping.
+        if (ypos >= C8_HEIGHT)
         {
             ypos -= C8_HEIGHT;
         }
-        
+
+        // Just read the byte of sprite data from memory directly instead.
+        unsigned char byte = C8_RAM[C8_I + y];
+
+        // The "width" of the pixel is the number of bits in a byte.
         for (unsigned char x = 0; x < 8; x++)
         {
             unsigned char xpos = C8_V[instruction->x] + x;
-            if (xpos > C8_WIDTH)
+            
+            // Horizontal wrapping.
+            if (xpos >= C8_WIDTH)
             {
                 xpos -= C8_WIDTH;
             }
-            
-            if ((sprite[y] & 0x80) > 0)
-            {
-                bool bit = (C8_Buffer[ypos][xpos]) ^ (sprite[y] >> x);
-                C8_V[C8_VF] = !bit;
-                C8_Buffer[ypos][xpos] = bit;
-            }
 
-            sprite[y] = sprite[y] << 1;
+            // Is the bit at 7-x set?
+            if ((byte >> (7 - x)) & 1)
+            {
+                // Collision detection!
+                if (C8_Buffer[ypos][xpos] == 1)
+                {
+                    // Don't overwrite it like last time! :)
+                    C8_V[C8_VF] = 1;
+                }
+
+                // Now xor the bit into the buffer (i.e. clear if there
+                // is already a bit there).
+                C8_Buffer[ypos][xpos] ^= 1;
+            }
         }
     }
 }
