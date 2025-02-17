@@ -1,7 +1,7 @@
 # raychip-8
 Chip-8 interpreter using C with raylib.
 
-![Screenshot](https://github.com/MattDrivenDev/raychip-8/blob/master/screenshot.png)
+![Screenshot](https://github.com/MattDrivenDev/raychip-8/blob/main/screenshot.png)
 
 ## Docs/Specification
 [http://devernay.free.fr/hacks/chip8/C8TECH10.HTM](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM)
