@@ -14,7 +14,7 @@
 //----------------------------------------------------------------------------------
 // Defines / Config
 //----------------------------------------------------------------------------------
-#define C8_FILENAME             "4-flags.ch8"
+#define C8_FILENAME             "rom.ch8"
 #define C8_DEBUG_MODE           true
 #define C8_WIDTH                64
 #define C8_HEIGHT               32
@@ -27,7 +27,7 @@
 #define C8_VF                   15
 #define C8_V0                   0
 #define C8_CLOCK_SPEED          500
-#define C8_TIMER_SPEED    60
+#define C8_TIMER_SPEED          60
 
 #define C8_FONT_0_ADDR          0x000
 #define C8_FONT_1_ADDR          0x005
@@ -244,9 +244,10 @@ void interpret_instruction      (C8_Instruction *instruction);
 void increment_program_counter  (C8_Instruction *instruction);
 void load_hexfont_sprites       ();
 void load_rom                   ();
-void render_buffer              ();
+void render_buffer              (int originX, int originY);
 void read_input                 ();
 void test_font                  ();
+void render_keypad              (int posX, int posY);
 
 //----------------------------------------------------------------------------------
 // Main entry point
@@ -255,13 +256,13 @@ int main()
 {
     // raylib Initialization
     //--------------------------------------------------------------------------------------
-    const int screenWidth       = C8_WIDTH * C8_PIXEL_WIDTH;
-    const int screenHeight      = C8_HEIGHT * C8_PIXEL_HEIGHT;
+    const int screenOriginX     = 125;
+    const int screenOriginY     = 20;
     const float cycleTime       = 1.0f / C8_CLOCK_SPEED;
     const float frameTime       = 1.0f / 60; // 60 fps
     const float timerTime       = 1.0f / C8_TIMER_SPEED;
 
-    InitWindow(screenWidth, screenHeight, "raychip-8");  
+    InitWindow(785, 360, "raychip-8");  
     InitAudioDevice();
     
     initialize_instruction_set();
@@ -282,6 +283,8 @@ int main()
         float time = GetTime();       
 
         read_input();
+
+        render_keypad(10, 10);
         
         if (time - lastCycleTime >= cycleTime)
         {
@@ -298,7 +301,7 @@ int main()
         {
             lastFrameTime = time;
 
-            render_buffer();
+            render_buffer(screenOriginX, screenOriginY);
         }
 
         if (time - lastTimerTime >= timerTime)
@@ -407,19 +410,35 @@ void load_rom()
     }
 }
 
-void render_buffer()
+void render_buffer(int originX, int originY)
 {
     BeginDrawing();
-    for (int i = 0; i < C8_HEIGHT; i++)
+
+    ClearBackground(RAYWHITE);
+
+    // Frame
     {
-        for (int j = 0; j < C8_WIDTH; j++)
-        {
-            int x = j * C8_PIXEL_WIDTH;
-            int y = i * C8_PIXEL_HEIGHT;
-            Color pixel_color = C8_Buffer[i][j] ? GREEN : BLACK;
-            DrawRectangle(x, y, C8_PIXEL_WIDTH, C8_PIXEL_HEIGHT, pixel_color);
-        }
+        int frameOriginX = originX - C8_PIXEL_WIDTH;
+        int frameOriginY = originY - C8_PIXEL_WIDTH;
+        int frameWidth = (C8_WIDTH * C8_PIXEL_WIDTH) + (C8_PIXEL_WIDTH * 2);
+        int frameHeight = (C8_HEIGHT * C8_PIXEL_HEIGHT) + (C8_PIXEL_WIDTH * 2);
+        DrawRectangle(frameOriginX, frameOriginY, frameWidth, frameHeight, DARKGRAY);
     }    
+
+    // Screen
+    {
+        for (int i = 0; i < C8_HEIGHT; i++)
+        {
+            for (int j = 0; j < C8_WIDTH; j++)
+            {
+                int x = (j * C8_PIXEL_WIDTH) + originX;
+                int y = (i * C8_PIXEL_HEIGHT) + originY;
+                Color pixel_color = C8_Buffer[i][j] ? GREEN : BLACK;
+                DrawRectangle(x, y, C8_PIXEL_WIDTH, C8_PIXEL_HEIGHT, pixel_color);
+            }
+        }    
+    }
+
     EndDrawing();
 }
 
@@ -432,7 +451,7 @@ void read_input()
     C8_Keyboard[0x1] = IsKeyDown(KEY_ONE);
     C8_Keyboard[0x2] = IsKeyDown(KEY_TWO);
     C8_Keyboard[0x3] = IsKeyDown(KEY_THREE);
-    C8_Keyboard[0xC] = IsKeyDown(KEY_C);
+    C8_Keyboard[0xC] = IsKeyDown(KEY_FOUR);
 
     C8_Keyboard[0x4] = IsKeyDown(KEY_Q);
     C8_Keyboard[0x5] = IsKeyDown(KEY_W);
@@ -975,6 +994,99 @@ void C8_LD_VX_I(C8_Instruction *instruction)
     for (i = C8_V0; i <= instruction->x; i++)
     {
         C8_V[i] = C8_RAM[C8_I + i];
+    }
+}
+
+void render_keypad(int posX, int posY)
+{
+    // There is NOTHING clever about this. We're not measuring fonts.
+    // We're not looping through keys. We're just hard-coded writing a 
+    // keypad graphic + text to the screen... This shows the user when
+    // they're pressing keys and also shows them what keys to use.
+    const int rowHeight = 25;
+
+    // Row 1
+    { 
+        int colX = posX;
+        int rowY = posY;
+
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_ONE) ? DARKGREEN : DARKGRAY);
+        DrawText("1", colX + 7, rowY + 1, 20, IsKeyDown(KEY_ONE) ? WHITE : GREEN);
+
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_TWO) ? DARKGREEN : DARKGRAY);
+        DrawText("2", colX + 5, rowY + 1, 20, IsKeyDown(KEY_TWO) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_THREE) ? DARKGREEN : DARKGRAY);
+        DrawText("3", colX + 5, rowY + 1, 20, IsKeyDown(KEY_THREE) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_FOUR) ? DARKGREEN : DARKGRAY);
+        DrawText("4", colX + 5, rowY + 1, 20, IsKeyDown(KEY_FOUR) ? WHITE : GREEN);
+    }
+
+    // Row 2
+    { 
+        int colX = posX;
+        int rowY = posY + rowHeight;      
+
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_Q) ? DARKGREEN : DARKGRAY);
+        DrawText("Q", colX + 4, rowY + 1, 20, IsKeyDown(KEY_Q) ? WHITE : GREEN);
+
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_W) ? DARKGREEN : DARKGRAY);
+        DrawText("W", colX + 3, rowY + 1, 20, IsKeyDown(KEY_W) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_E) ? DARKGREEN : DARKGRAY);
+        DrawText("E", colX + 4, rowY + 1, 20, IsKeyDown(KEY_E) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_R) ? DARKGREEN : DARKGRAY);
+        DrawText("R", colX + 4, rowY + 1, 20, IsKeyDown(KEY_R) ? WHITE : GREEN);
+    }
+
+    // Row 3
+    { 
+        int colX = posX;
+        int rowY = posY + (rowHeight * 2);     
+
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_A) ? DARKGREEN : DARKGRAY);
+        DrawText("A", colX + 4, rowY + 1, 20, IsKeyDown(KEY_A) ? WHITE : GREEN);
+
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_S) ? DARKGREEN : DARKGRAY);
+        DrawText("S", colX + 4, rowY + 1, 20, IsKeyDown(KEY_S) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_D) ? DARKGREEN : DARKGRAY);
+        DrawText("D", colX + 4, rowY + 1, 20, IsKeyDown(KEY_D) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_F) ? DARKGREEN : DARKGRAY);
+        DrawText("F", colX + 4, rowY + 1, 20, IsKeyDown(KEY_F) ? WHITE : GREEN);
+    }
+
+    // Row 4
+    { 
+        int colX = posX;
+        int rowY = posY + (rowHeight * 3);  
+
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_Z) ? DARKGREEN : DARKGRAY);
+        DrawText("Z", colX + 4, rowY + 1, 20, IsKeyDown(KEY_Z) ? WHITE : GREEN);
+
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_X) ? DARKGREEN : DARKGRAY);
+        DrawText("X", colX + 4, rowY + 1, 20, IsKeyDown(KEY_X) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_C) ? DARKGREEN : DARKGRAY);
+        DrawText("C", colX + 4, rowY + 1, 20, IsKeyDown(KEY_C) ? WHITE : GREEN);
+        
+        colX += 25;
+        DrawRectangle(colX, rowY, 20, 20, IsKeyDown(KEY_V) ? DARKGREEN : DARKGRAY);
+        DrawText("V", colX + 3, rowY + 1, 20, IsKeyDown(KEY_V) ? WHITE : GREEN);
     }
 }
 
